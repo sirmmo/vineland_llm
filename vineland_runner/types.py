@@ -89,6 +89,7 @@ class RunRecord(BaseModel):
     reasoning_tokens: int = 0
     latency_s: float = 0.0
     success: Optional[bool] = None
+    verdict: Optional[str] = None  # "PASS"|"PARTIAL"|"FAIL"|"YES"|"NO"|None
     grading_detail: dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None
     timestamp: str = ""
@@ -103,10 +104,19 @@ class ScoreRow(BaseModel):
     tier: int
     n_reps: int
     n_successes: int
-    s: float          # success rate
-    y: int            # polytomous score 0/1/2
+    s: float          # raw success rate (backward-compat)
+    y: int            # polytomous score 0/1/2 (computed on s_partial_weighted)
     total_prompt_tokens: int = 0
     total_completion_tokens: int = 0
     total_reasoning_tokens: int = 0
     total_latency_s: float = 0.0
     mean_latency_s: float = 0.0
+    # Verdict distribution (Vineland-Extended)
+    n_partial: int = 0
+    n_fail: int = 0
+    n_yes: int = 0
+    n_no: int = 0
+    n_null: int = 0
+    n_empty_response: int = 0
+    s_partial_weighted: float = 0.0
+    grader_type: str = ""
