@@ -1,0 +1,138 @@
+# Vineland-Adapted LLM Assessment Items
+# 5 representative stub items — one per grading type and tier range.
+# TODO: Replace with all 72 items from the research paper appendix (to be provided separately).
+
+items:
+  # --- Communication domain (CM) ---
+
+  - id: CM-REC-1
+    domain: CM
+    subdomain: REC
+    tier: 1
+    prompt_template: |
+      Read the following paragraph and identify its main claim.
+
+      Paragraph:
+      {paragraph}
+
+      Respond with only the main claim, in one sentence.
+    prompt_variables:
+      paragraph: |
+        Regular exercise has been linked to improved mood in adults. While
+        many factors contribute to mental wellbeing, studies consistently
+        show physical activity as a significant contributor. The mechanism
+        involves endorphin release and reduced cortisol levels. Even 30
+        minutes of walking per day has been shown to produce measurable
+        effects. Consistency matters more than intensity.
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        A model was asked to identify the main claim of a paragraph about
+        exercise and mood. The main claim is that regular exercise improves
+        mood in adults.
+
+        Model's response: {response}
+
+        Does the response capture this main claim? Answer "YES" or "NO"
+        followed by a short justification.
+      judge_parse: "^YES"
+
+  - id: CM-EXP-3
+    domain: CM
+    subdomain: EXP
+    tier: 3
+    prompt_template: |
+      Rewrite the following technical sentence so a 10-year-old could understand it.
+      Use simple words and no jargon.
+
+      Sentence: {sentence}
+
+      Simplified version:
+    prompt_variables:
+      sentence: >
+        The mitochondria are organelles that generate adenosine triphosphate
+        through oxidative phosphorylation, supplying cellular energy.
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        A model was asked to simplify this sentence: "The mitochondria are
+        organelles that generate ATP through oxidative phosphorylation."
+        A good answer should avoid jargon and explain that mitochondria
+        produce energy for cells.
+
+        Model's response: {response}
+
+        Does the response avoid jargon AND correctly convey that mitochondria
+        produce energy? Answer "YES" or "NO" then justify briefly.
+      judge_parse: "^YES"
+
+  # --- Agentic Functioning domain (AF) ---
+
+  - id: AF-TOL-1
+    domain: AF
+    subdomain: TOL
+    tier: 1
+    prompt_template: |
+      You have access to three tools:
+      - calculator(expression: str) -> number
+      - search(query: str) -> list of results
+      - calendar(date: str) -> events
+
+      Question: {question}
+
+      Respond with a JSON object: {{"tool": "<tool_name>", "args": {{...}}}}
+    prompt_variables:
+      question: "What is 17% of 340?"
+    success_criterion:
+      type: exact_match
+      expected_regex: '"tool"\s*:\s*"calculator"'
+
+  - id: AF-PLN-4
+    domain: AF
+    subdomain: PLN
+    tier: 4
+    prompt_template: |
+      You need to bake a birthday cake. Below is a list of steps in random order.
+      Arrange them into the correct sequence by outputting an ordered list (1., 2., ...):
+
+      Steps:
+      {steps}
+    prompt_variables:
+      steps: |
+        - Let the cake cool completely
+        - Preheat the oven to 350°F
+        - Mix dry ingredients in a bowl
+        - Frost the cooled cake
+        - Pour batter into a greased pan
+        - Combine wet and dry ingredients to make batter
+        - Bake for 30 minutes
+    success_criterion:
+      type: exact_match
+      expected_regex: "(?s)Preheat.*Mix.*Combine.*Pour.*Bake.*cool.*Frost"
+
+  # --- Daily Living Skills domain (DLS) ---
+
+  - id: DLS-DOM-2
+    domain: DLS
+    subdomain: DOM
+    tier: 2
+    prompt_template: |
+      Answer the following practical question concisely.
+
+      Question: {question}
+    prompt_variables:
+      question: >
+        You discover a small electrical fire in your kitchen. The fire is contained
+        to a toaster that is still plugged in. What are the first two things you should do?
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        A model was asked what to do first when a toaster catches fire.
+        The two correct first actions are: (1) unplug the toaster or cut power,
+        and (2) use a fire extinguisher or smother with a lid — NOT water.
+
+        Model's response: {response}
+
+        Does the response mention both: (a) disconnecting power, and (b) using
+        a non-water method to extinguish? Answer "YES" or "NO" then justify briefly.
+      judge_parse: "^YES"

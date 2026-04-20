@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "vineland-item",
+  "title": "VinelandItem",
+  "type": "object",
+  "required": ["id", "domain", "subdomain", "tier", "prompt_template", "success_criterion"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[A-Z]+-[0-9]+$",
+      "description": "Unique item identifier: DOMAIN-SUBDOMAIN-NUMBER"
+    },
+    "domain": {
+      "type": "string",
+      "enum": ["CM", "DLS", "SOC", "AF"],
+      "description": "Assessment domain"
+    },
+    "subdomain": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 10
+    },
+    "tier": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8,
+      "description": "Capability-tier band (1=easiest, 5=hardest)"
+    },
+    "prompt_template": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Python str.format-style template; variables are in {braces}"
+    },
+    "prompt_variables": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Values to substitute into prompt_template"
+    },
+    "success_criterion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {"type": "string", "const": "exact_match"},
+            "expected_answer": {"type": "string"},
+            "expected_regex": {"type": "string"}
+          },
+          "anyOf": [
+            {"required": ["expected_answer"]},
+            {"required": ["expected_regex"]}
+          ]
+        },
+        {
+          "type": "object",
+          "required": ["type", "judge_prompt", "judge_parse"],
+          "properties": {
+            "type": {"type": "string", "const": "llm_judge"},
+            "judge_prompt": {"type": "string"},
+            "judge_parse": {"type": "string"}
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,40 @@
+pilot:
+  name: "pilot_2026_04"
+  agents:
+    # Paid / frontier
+    - claude-opus-4-5
+    - gpt-5
+    - gpt-5-reasoning
+    - deepseek-r1
+    - o3
+    # Paid / open
+    - mistral-7b
+    - mistral-7b-instruct-v0.3
+    - mistral-7b-instruct-v0.1
+    - gemma-27b
+    - llama-70b
+    # Free tier (OpenRouter, 15s wait)
+    - llama-3.1-8b-free
+    - llama-3.2-3b-free
+    - llama-3.3-70b-free
+    - gemma-3-1b-free
+    - gemma-3-4b-free
+    - gemma-3-12b-free
+    - gemma-3-27b-free
+    - mistral-7b-free
+    - qwen-2.5-7b-free
+    - qwen-2.5-72b-free
+    - deepseek-r1-free
+    - deepseek-v3-free
+    - phi-3-mini-free
+    - openchat-7b-free
+    - zephyr-7b-free
+    - gemma-4-31b-it-free
+    - gemma-4-26b-a4b-it-free
+  items: "auto"
+  items_per_subdomain: 2
+  n_replications: 5
+  output_dir: "runs/pilot_2026_04"
+  judge_agent: claude-opus-4-5
+  max_concurrency: 4
+  null_success_as_zero: false

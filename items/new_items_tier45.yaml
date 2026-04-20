@@ -1,0 +1,246 @@
+# 4 new tier 4-5 items to append to items.yaml
+# Designed to test floor effects on frontier LLMs (Opus 4.5, DeepSeek R1, etc.)
+# Author: Marco Montanari, 2026-04-17
+
+items:
+
+  # ==========================================================================
+  # AF-WMM-5 (tier 5): Counterfactual state projection
+  # ==========================================================================
+  - id: AF-WMM-5
+    domain: AF
+    subdomain: WMM
+    tier: 5
+    prompt_template: |
+      You are tracking the state of a small warehouse. At time T0 the state is:
+      - Shelf A: contains box-1 (red), box-2 (blue)
+      - Shelf B: empty
+      - Worker W is on break (idle)
+      - Forklift F is parked at dock
+
+      The following events happened in sequence:
+      T1: Worker W returned and moved box-1 from Shelf A to Shelf B.
+      T2: Forklift F moved box-2 from Shelf A to the loading dock.
+      T3: Worker W placed a new box (box-3, green) on Shelf A.
+      T4: A power outage stopped Forklift F at the dock; box-2 is still on F.
+
+      Counterfactual question: If event T2 had not happened (forklift F never moved),
+      but all other events (T1, T3, T4) had still occurred exactly as described,
+      what is the state at T4?
+
+      Answer with the state of each location and object. Be complete and explicit.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        A model was asked a counterfactual reasoning question about warehouse state.
+
+        The ground-truth counterfactual state at T4 (if T2 had not happened) is:
+        - Shelf A: contains box-2 (blue, never moved) AND box-3 (green, placed at T3)
+        - Shelf B: contains box-1 (red, moved at T1 — this still happened)
+        - Worker W: active (returned at T1, placed box at T3, no reason to be on break)
+        - Forklift F: parked at dock (never moved since T2 didn't happen); no power
+          outage effect relevant to F's position since F never left.
+        - Loading dock: empty of our tracked boxes (box-2 stayed on Shelf A)
+
+        Critical points the response MUST get right:
+        1. box-2 is on Shelf A (NOT on the forklift, NOT at the loading dock)
+        2. box-3 is also on Shelf A (T3 still happened)
+        3. Shelf A has BOTH box-2 AND box-3
+        4. box-1 is on Shelf B (T1 still happened)
+        5. The forklift is at the dock, NOT at the loading dock with box-2
+
+        Model's response: {response}
+
+        Evaluate against the five critical points above. Output ONLY one of:
+        - "PASS" if 5/5 critical points are explicitly or clearly implicitly correct.
+        - "PARTIAL" if 3-4/5 are correct.
+        - "FAIL" if 0-2/5 are correct.
+        After the label, briefly justify which points were missed or wrong.
+      judge_parse: "^PASS"
+
+  # ==========================================================================
+  # AF-TOL-5 (tier 5): Tool orchestration with implicit dependencies
+  # ==========================================================================
+  - id: AF-TOL-5
+    domain: AF
+    subdomain: TOL
+    tier: 5
+    prompt_template: |
+      You have access to these tools:
+      - get_user_timezone() -> str (returns e.g. "Europe/Rome")
+      - get_current_time(timezone: str) -> str (returns ISO datetime)
+      - search_flights(from_city: str, to_city: str, depart_datetime_iso: str) -> list
+      - convert_currency(amount: float, from_curr: str, to_curr: str) -> float
+      - get_exchange_rate_source() -> str (returns the data source URL)
+
+      Task: The user asks "Find me a flight from Rome to Tokyo departing 48 hours
+      from now. Show prices in USD and indicate the source of the exchange rate used."
+
+      Output the MINIMUM sequence of tool calls needed to answer this task.
+      Format: JSON list of {"step": N, "tool": "...", "args": {...}, "depends_on": [step indices]}
+
+      Rules:
+      - Do NOT make unnecessary calls.
+      - Do NOT call a tool whose result is not used.
+      - depends_on must correctly identify prior steps whose OUTPUT is needed.
+      - Do not call get_exchange_rate_source before any currency conversion.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate whether the model's tool orchestration plan is correct.
+
+        The minimal correct plan is:
+        Step 1: get_user_timezone() — no deps
+        Step 2: get_current_time(timezone=<from step 1>) — depends_on: [1]
+        Step 3: search_flights(from_city="Rome", to_city="Tokyo",
+                depart_datetime_iso=<from step 2, +48h>) — depends_on: [2]
+        Step 4: convert_currency(amount=<price from step 3>, from_curr=<currency from step 3>,
+                to_curr="USD") — depends_on: [3]
+        Step 5: get_exchange_rate_source() — no dependencies in input but logically after step 4
+
+        Critical correctness criteria (all must hold for PASS):
+        1. Exactly 5 distinct tool calls, no more, no less.
+        2. Step dependencies are correct (step 2 depends on 1, step 3 on 2, step 4 on 3).
+        3. get_current_time is called with the timezone from get_user_timezone, NOT hardcoded.
+        4. search_flights receives datetime, NOT a raw "48 hours from now" string.
+        5. convert_currency is called with the actual flight price (depends_on step 3).
+
+        Model's response: {response}
+
+        Output ONLY one of: "PASS" (5/5 criteria met), "PARTIAL" (3-4/5), "FAIL" (0-2/5).
+        Briefly state which criteria failed.
+      judge_parse: "^PASS"
+
+  # ==========================================================================
+  # AF-CTX-4 (tier 4): Context pruning with retrieval guarantee
+  # ==========================================================================
+  - id: AF-CTX-4
+    domain: AF
+    subdomain: CTX
+    tier: 4
+    prompt_template: |
+      You are in turn 7 of a conversation with limited context. Below is the
+      conversation summary you have so far. You must compress it to <= 3 sentences
+      WITHOUT losing any information that would be needed to correctly answer the
+      user's pending question (shown at the end).
+
+      Conversation so far:
+      [Turn 1] User: I'm planning a trip to Greece. My budget is 2000 EUR for 10 days.
+      [Turn 2] Assistant: Great. When are you going?
+      [Turn 3] User: Second week of June. I like hiking and ancient ruins. I'm vegetarian.
+      [Turn 4] Assistant: Consider Crete for hiking gorges, and Delphi for ruins.
+      [Turn 5] User: My friend Lucia joins me. She has a nut allergy.
+      [Turn 6] Assistant: Noted. She should avoid baklava and several Greek pastries.
+
+      Pending question (turn 7): "Can you draft a 3-day food itinerary for the first
+      stop of our trip?"
+
+      Output ONLY the compressed summary (max 3 sentences). Do not answer the question.
+      Do not add preamble or meta-commentary.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate whether the compressed summary preserves all information needed
+        for the pending question.
+
+        Information that MUST be preserved:
+        1. Greece trip
+        2. Budget: 2000 EUR for 10 days (or equivalent)
+        3. Time: second week of June
+        4. Vegetarian (primary user)
+        5. Nut allergy (Lucia, the friend joining)
+        6. Preferences: hiking and ancient ruins
+        7. At least one destination discussed (Crete or Delphi)
+        8. Companion: Lucia is joining
+
+        Critical: points 4 and 5 (vegetarian + nut allergy) are ESSENTIAL for a
+        food itinerary. A summary missing either fails.
+
+        Also check:
+        - Summary is <= 3 sentences (check sentence count; "3 sentences" = 3 full stops)
+        - Summary does NOT answer the pending question (does not give an itinerary)
+        - Summary does not add invented information
+
+        Model's response: {response}
+
+        Output exactly one of:
+        - "PASS" if all 8 info points preserved AND <= 3 sentences AND no itinerary included
+        - "FAIL" otherwise
+        Briefly state what is missing or wrong.
+      judge_parse: "^PASS"
+
+  # ==========================================================================
+  # AF-AFD-5 (tier 5): Agent-relative affordance discrimination
+  # ==========================================================================
+  - id: AF-AFD-5
+    domain: AF
+    subdomain: AFD
+    tier: 5
+    prompt_template: |
+      Consider a simulated 2D environment with three agents:
+      - Agent A: a humanoid with two arms, height 1.7m, can grip and lift up to 20kg
+      - Agent B: a small wheeled robot, height 0.4m, can push objects but cannot grip
+      - Agent C: a drone, can fly up to 3m altitude, cannot manipulate any object
+
+      The environment contains:
+      - A cardboard box (2kg) on the floor
+      - A shelf at 2m height, currently holding a book
+      - A ladder leaning against the wall (climbable by Agent A)
+      - A narrow tunnel (0.3m diameter) connecting two rooms
+      - A button at 1.5m height that opens a door
+
+      For EACH of the following affordances, state which agent(s) it is available
+      for, and briefly justify. Crucial: an affordance may exist for one agent
+      but NOT for another in the same environment.
+
+      Affordances to analyze:
+      1. "Retrieve the book from the shelf"
+      2. "Push the box through the tunnel to the next room"
+      3. "Press the button"
+      4. "Lift the box onto the shelf"
+
+      Output a structured answer: for each affordance, list which agents {A, B, C}
+      it is available for, and for each such agent, one sentence of justification.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate the model's agent-relative affordance analysis.
+
+        Ground truth:
+        1. "Retrieve book from shelf":
+           - A: YES (climb ladder, grip book)
+           - B: NO (can't reach 2m, can't grip)
+           - C: partial credit if noted that C can fly to 2m but cannot grip — should
+             be NO overall since retrieve implies grip
+        2. "Push box through tunnel":
+           - A: NO (1.7m won't fit in 0.3m tunnel)
+           - B: YES (0.4m may fit if we allow tight fit — accept YES; strict check:
+             0.4m > 0.3m so strictly NO. Accept either answer IF justified.)
+           - C: NO (drone, cannot manipulate)
+        3. "Press the button" (at 1.5m height):
+           - A: YES (1.7m can reach)
+           - B: NO (0.4m can't reach 1.5m)
+           - C: YES (can fly to 1.5m; cannot grip but press button doesn't require grip)
+        4. "Lift box onto shelf":
+           - A: YES (grip + lift + reach via ladder)
+           - B: NO (can't grip, can't reach)
+           - C: NO (can reach but cannot grip/lift)
+
+        Critical criteria:
+        - The model MUST acknowledge that the same affordance is available for some
+          agents and not others (agent-relative reasoning).
+        - The model MUST give a justification based on agent capabilities, not generic.
+        - At least 3 of the 4 affordances must have correct agent lists (with 
+          reasonable disagreement on affordance 2 tunnel-size boundary case).
+
+        Model's response: {response}
+
+        Output:
+        - "PASS" if 3+ affordances correct AND model shows explicit agent-relative reasoning
+        - "PARTIAL" if 2 affordances correct
+        - "FAIL" if <2 correct or no agent-relative reasoning shown
+      judge_parse: "^PASS"

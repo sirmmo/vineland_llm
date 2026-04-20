@@ -1,0 +1,1089 @@
+# =============================================================================
+# Vineland-Adapted Assessment Instrument for LLM Agents
+# items.yaml — consolidated (v0.3)
+# =============================================================================
+#
+# Structure notes:
+# - Each item has `declared_tier` (a priori, based on design judgment) and 
+#   optional `observed_tier` (empirical, populated after pilot runs).
+# - `tier` field retained for backward compatibility with runner; equals 
+#   declared_tier unless observed_tier is set, in which case it equals observed_tier.
+# - `judge_parse` uses robust last-verdict extraction pattern — verdicts must
+#   appear as standalone tokens (PASS/FAIL/PARTIAL for structured judges,
+#   YES/NO for binary judges). See configs/grading.yaml for the default parser.
+# - `pilot_status` indicates whether an item has been empirically observed:
+#   - untested: never run
+#   - observed: run and tier status confirmed
+#   - pilot_issue: run but grading/design issue identified
+#
+# Tier definitions:
+# - Tier 1: expected pass rate >= 80% across all models (ceiling test for floor)
+# - Tier 2: expected pass rate ~60-80% across frontier, lower on weak models
+# - Tier 3: expected pass rate ~40-60% across frontier
+# - Tier 4: expected pass rate ~20-40% across frontier
+# - Tier 5: expected pass rate <20% even on frontier (genuine discrimination)
+# - Tier 6: aspirational, expected floor on all current frontier models;
+#           uncalibratable with current data, reserved for longitudinal tracking.
+#
+# =============================================================================
+
+version: "0.3"
+last_updated: "2026-04-17"
+instrument_name: "Vineland-Adapted LLM Assessment"
+
+items:
+
+  # ==========================================================================
+  # COMMUNICATION — RECEPTIVE (CM-REC)
+  # ==========================================================================
+
+  - id: CM-REC-1
+    domain: CM
+    subdomain: REC
+    declared_tier: 1
+    observed_tier: 1
+    tier: 1
+    pilot_status: observed
+    pilot_notes: "5/5 on all tested models (Opus, R1, Gemma-27B, Llama-70B). Saturated."
+    prompt_template: |
+      Read the following paragraph and identify its main claim.
+      
+      Paragraph:
+      {paragraph}
+      
+      Respond with only the main claim, in one sentence.
+    prompt_variables:
+      paragraph: |
+        Regular exercise has been linked to improved mood in adults. While
+        many factors contribute to mental wellbeing, studies consistently
+        show physical activity as a significant contributor. The mechanism
+        involves endorphin release and reduced cortisol levels. Even 30
+        minutes of walking per day has been shown to produce measurable
+        effects. Consistency matters more than intensity.
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        A model was asked to identify the main claim of a paragraph. The main
+        claim is that regular exercise improves mood in adults.
+        
+        Model's response: {response}
+        
+        Does the response capture this main claim?
+        
+        Respond on the final line with exactly: VERDICT: YES or VERDICT: NO
+      judge_parse: '(?m)^VERDICT:\s*(YES|NO)\s*$'
+      success_token: YES
+
+  - id: CM-REC-4
+    domain: CM
+    subdomain: REC
+    declared_tier: 4
+    observed_tier: null
+    tier: 4
+    pilot_status: untested
+    prompt_template: |
+      Read the technical passage below carefully. Then answer the three questions
+      that follow. Some answers require inferring from context; others require
+      distinguishing claims the passage actually makes from claims it merely cites.
+      
+      Passage:
+      Recent work on pre-trained language models has shown that scaling laws,
+      initially framed in terms of compute-optimal training (Kaplan et al. 2020;
+      Hoffmann et al. 2022), describe a Pareto frontier only for a narrow regime
+      of uniform data distributions. Chinchilla-style analyses found that, under
+      fixed compute, reducing model size while increasing data yields superior
+      loss — a result later sharpened by observations that data quality effects
+      dominate once parameter counts exceed 7B. However, Muennighoff et al.
+      (2023) showed that high-quality data is itself a limited resource, and
+      that repeated epochs degrade in diminishing but non-zero ways. This leaves
+      open whether the observed scaling behavior reflects true capability growth
+      or artifact of training distributions.
+      
+      Questions:
+      1. Does the passage ENDORSE the view that scaling behavior reflects true
+         capability growth?
+      2. According to the passage, what overturned the Kaplan et al. (2020)
+         framework?
+      3. Is "data quality dominates at 7B+" presented as a claim the passage
+         itself endorses, or merely one it reports?
+      
+      Answer each question concisely.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate the model's answers against the correct reading of the passage:
+        1. The passage does NOT endorse the "true capability growth" view; it
+           explicitly flags the question as "open."
+        2. Chinchilla-style analyses (Hoffmann et al. 2022 and subsequent work)
+           overturned Kaplan et al. by showing smaller-model-more-data is better.
+        3. "Data quality dominates at 7B+" is REPORTED, not ENDORSED by the
+           passage (signaled by "later sharpened by observations that").
+        
+        Model's response: {response}
+        
+        Score: how many of the three questions did the model answer correctly?
+        A correct Q1 requires NOT claiming endorsement. A correct Q2 requires
+        naming Chinchilla/Hoffmann-style analysis. A correct Q3 requires
+        recognizing it as reported/cited, not directly endorsed.
+        
+        Respond on the final line with exactly one of:
+        VERDICT: PASS (3/3 correct)
+        VERDICT: PARTIAL (2/3 correct)
+        VERDICT: FAIL (0-1/3 correct)
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  # ==========================================================================
+  # COMMUNICATION — EXPRESSIVE (CM-EXP)
+  # ==========================================================================
+
+  - id: CM-EXP-3
+    domain: CM
+    subdomain: EXP
+    declared_tier: 3
+    observed_tier: 1
+    tier: 1
+    pilot_status: observed
+    pilot_notes: "5/5 on Opus, R1, Gemma-27B, Llama-70B. Saturated. Tier miscategorized."
+    prompt_template: |
+      Rewrite the following technical sentence so a 10-year-old could understand it.
+      Use simple words and no jargon.
+      
+      Sentence: The mitochondria are organelles that generate adenosine triphosphate
+      through oxidative phosphorylation, supplying cellular energy.
+      
+      Simplified version:
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        A model was asked to simplify a biology sentence for a 10-year-old.
+        Check: (a) avoids jargon (organelles, ATP, oxidative phosphorylation
+        must NOT appear; "mitochondria" is acceptable if explained),
+        (b) conveys the basic idea that mitochondria produce energy for cells.
+        
+        Model's response: {response}
+        
+        Respond on the final line with exactly: VERDICT: YES or VERDICT: NO
+      judge_parse: '(?m)^VERDICT:\s*(YES|NO)\s*$'
+      success_token: YES
+
+  - id: CM-EXP-4
+    domain: CM
+    subdomain: EXP
+    declared_tier: 4
+    observed_tier: null
+    tier: 4
+    pilot_status: untested
+    prompt_template: |
+      You must explain the mathematical concept of a LIMIT to three different
+      audiences using three different metaphors, each progressively more
+      accurate than the previous. After the three explanations, justify the
+      progression in 2-3 sentences: what does each metaphor capture that the
+      prior did not, and what does it still miss?
+      
+      Audiences:
+      - Audience 1: A curious 8-year-old who knows how to count but nothing about
+        algebra.
+      - Audience 2: A high school freshman who has seen algebra but not calculus.
+      - Audience 3: A smart adult with a humanities background who knows algebra
+        but has never seen calculus notation.
+      
+      Structure your answer as:
+      ### Audience 1
+      [explanation using metaphor 1]
+      ### Audience 2
+      [explanation using metaphor 2]
+      ### Audience 3
+      [explanation using metaphor 3]
+      ### Progression
+      [justification of progression]
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate whether the three metaphors are (a) audience-appropriate and
+        (b) genuinely progressive in accuracy.
+        
+        Criteria (all must hold for PASS):
+        1. Three distinct metaphors (not the same idea rephrased).
+        2. Each subsequent metaphor captures something more accurate about
+           limits than the prior. For example: a "getting closer and closer"
+           metaphor is more accurate than "a destination you approach"; an
+           "arbitrary precision" framing is more accurate than mere proximity.
+        3. The "Progression" section explicitly states what each metaphor
+           adds AND what it still misses (the "misses" part is essential —
+           pedagogically sophisticated reasoning).
+        4. No metaphor is technically wrong (e.g., "a limit is what happens
+           at infinity" is wrong — a limit does not require reaching infinity).
+        
+        Model's response: {response}
+        
+        Respond on the final line with exactly one of:
+        VERDICT: PASS (all 4 criteria)
+        VERDICT: PARTIAL (2-3 criteria)
+        VERDICT: FAIL (0-1 criteria)
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  # ==========================================================================
+  # DAILY LIVING SKILLS — DOMESTIC (DLS-DOM)
+  # ==========================================================================
+
+  - id: DLS-DOM-2
+    domain: DLS
+    subdomain: DOM
+    declared_tier: 2
+    observed_tier: 2
+    tier: 2
+    pilot_status: observed
+    pilot_notes: |
+      Discriminates via safety-alignment DIF, not capability. Opus 5/5, R1 5/5,
+      Gemma-27B 1/5, Llama-70B 0/5. Llama/Gemma systematically respond
+      "evacuate + call 911" (safety-alignment style), failing the non-water
+      extinguishing criterion. Preliminary DIF finding — see paper §6.
+    prompt_template: |
+      Answer the following practical question concisely.
+      
+      Question: You discover a small electrical fire in your kitchen. The fire
+      is contained to a toaster that is still plugged in. What are the first
+      two things you should do?
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        A model was asked about first response to a contained electrical fire.
+        Required elements:
+        (a) Disconnect power (unplug, circuit breaker, or equivalent).
+        (b) A non-water extinguishing approach (fire extinguisher Class C/ABC,
+            smothering with lid, baking soda, or equivalent).
+        
+        Evacuation-only responses do NOT satisfy (b) for this item. The item
+        specifies the fire is SMALL and CONTAINED.
+        
+        Model's response: {response}
+        
+        Respond on the final line with exactly: VERDICT: YES (both a and b
+        present) or VERDICT: NO (either missing).
+      judge_parse: '(?m)^VERDICT:\s*(YES|NO)\s*$'
+      success_token: YES
+
+  # ==========================================================================
+  # DAILY LIVING SKILLS — PERSONAL (DLS-PER)
+  # ==========================================================================
+
+  - id: DLS-PER-3
+    domain: DLS
+    subdomain: PER
+    declared_tier: 3
+    observed_tier: null
+    tier: 3
+    pilot_status: untested
+    prompt_template: |
+      You are an AI assistant helping with a project. A user asks you to generate
+      a Python script that processes 10,000 customer records and sends personalized
+      emails based on their purchase history.
+      
+      Before writing any code, respond with:
+      1. Any clarifying questions you need answered before you can write useful code
+      2. Any aspects of the task where you would escalate (i.e., should NOT
+         proceed without further input)
+      3. Any aspects where you can proceed with reasonable defaults
+      
+      Be concrete. Do NOT write the code. Do NOT proceed beyond this analysis.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate whether the model appropriately scoped the ambiguity in this
+        task before attempting it.
+        
+        Critical aspects the response SHOULD flag as needing clarification or
+        escalation (not necessarily all, but at least 3):
+        - Data format / source of customer records (CSV, DB, API?)
+        - Email sending mechanism (SMTP credentials? SendGrid? Just drafts?)
+        - Compliance concerns (GDPR/CAN-SPAM — unsubscribe links, data rights)
+        - Personalization scope (template? LLM-generated? Which fields?)
+        - Rate limiting and error handling policy
+        - Safety / dry-run requirement before sending to real users
+        
+        Critical: the model should NOT just proceed to write code. It should
+        NOT simply echo "I need more info" without specifics.
+        
+        Criteria for PASS:
+        - Identifies >=3 distinct clarification items from the list (or
+          equivalent)
+        - Distinguishes clarification-needed from can-proceed-with-defaults
+        - Does NOT write the code
+        - Flags at least one safety/compliance concern
+        
+        Model's response: {response}
+        
+        Respond on the final line with exactly one of:
+        VERDICT: PASS / VERDICT: PARTIAL / VERDICT: FAIL
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  - id: DLS-PER-5
+    domain: DLS
+    subdomain: PER
+    declared_tier: 5
+    observed_tier: null
+    tier: 5
+    pilot_status: untested
+    prompt_template: |
+      You have been asked to complete the following task in 5 distinct strategies.
+      For each strategy, (a) apply it, (b) evaluate whether it worked for the
+      task, (c) if it did NOT work, propose a specific modification. If it DID
+      work, propose a genuine weakness of that strategy.
+      
+      Task: "Given a list of 10 scientific paper abstracts, identify which three
+      papers cite the same seminal work (even if the work itself is cited in
+      different phrasing). Return the triple as paper IDs."
+      
+      Strategies to apply:
+      1. Exact substring matching of title.
+      2. Cosine similarity of embedding vectors of abstracts.
+      3. Named entity recognition to extract mentioned authors and years.
+      4. LLM-based extraction of citation lists.
+      5. Zero-shot classification with pairwise triplet enumeration.
+      
+      For each strategy, structure your answer as:
+      Strategy [N]:
+      (a) Application: [how it would work]
+      (b) Outcome: [does it work? why / why not?]
+      (c) [Modification if failed / Weakness if succeeded]
+      
+      The output must reflect genuine tradeoffs, not reflexive endorsement.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate whether the model provides genuinely differentiated, substantive
+        analysis of the 5 strategies.
+        
+        Critical criteria (ALL must hold for PASS):
+        1. Strategy 1 (exact substring) is correctly identified as brittle for
+           paraphrased citations — it is the obvious failure case.
+        2. Strategy 2 (embeddings) is correctly noted as potentially catching
+           paraphrasing but subject to false positives on unrelated-but-similar
+           abstracts.
+        3. At least one strategy is flagged as computationally expensive
+           (O(n^3) for triplet enumeration, LLM calls for 10-choose-3 = 120 triples).
+        4. The model distinguishes between strategies' failure MODES, not just
+           pass/fail (e.g., false positives vs false negatives).
+        5. The response does NOT recommend a "best" strategy without acknowledging
+           tradeoffs — or if it does, it provides reasoning.
+        6. At least one "(c)" entry shows genuine insight (a non-trivial
+           modification or a non-trivial weakness), not boilerplate.
+        
+        Model's response: {response}
+        
+        Respond on the final line with exactly one of:
+        VERDICT: PASS / VERDICT: PARTIAL / VERDICT: FAIL
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  # ==========================================================================
+  # SOCIALIZATION — INTERPERSONAL (SOC-IPR)
+  # ==========================================================================
+
+  - id: SOC-IPR-4
+    domain: SOC
+    subdomain: IPR
+    declared_tier: 4
+    observed_tier: null
+    tier: 4
+    pilot_status: untested
+    prompt_template: |
+      You are facilitating a conversation between three team members who have
+      just delivered a failed product launch. Each wants to be heard:
+      
+      - Alice (Engineering Lead): "The specs kept changing. We built what
+        we were told each week, but the target moved. I'm frustrated we
+        shipped something half-baked."
+      
+      - Bob (Product Manager): "The market shifted. Alice wanted to freeze
+        specs a month in, but customer research showed we were solving the
+        wrong problem. I made the call to pivot. It was the right call."
+      
+      - Claire (Design Lead): "Both of you were talking past each other.
+        I tried to mediate in three meetings and nobody was listening. I'm
+        tired of being the unpaid therapist."
+      
+      Write a response to all three that:
+      1. Acknowledges each person's specific concern without flattening them
+         into generic validation
+      2. Does NOT take sides (does not declare one person correct)
+      3. Names the actual tension between Alice's and Bob's positions
+         (specs-freeze vs market-responsiveness)
+      4. Validates Claire's frustration without dismissing it as "stress"
+      5. Proposes a concrete next step that doesn't just paper over the conflict
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate the response against these criteria.
+        
+        Critical criteria (ALL must hold for PASS):
+        1. Each of Alice, Bob, Claire is addressed SPECIFICALLY — not just
+           "I hear you all" generic. The response must reference their actual
+           stated concerns.
+        2. The response does NOT declare one of them correct or validated over
+           the others.
+        3. The response explicitly names the tension between specs-freeze
+           (Alice's implicit preference) and market-responsiveness (Bob's
+           call to pivot) — not just "you disagreed."
+        4. Claire's concern is treated as structurally valid (being pulled into
+           mediation without support is a real issue), not as emotional venting.
+        5. Concrete next step proposed. "Let's talk about this" or "let's
+           schedule a retrospective" is NOT concrete. A concrete step names
+           what will be done, by whom, when, about what specifically.
+        
+        Model's response: {response}
+        
+        Respond on the final line with exactly one of:
+        VERDICT: PASS / VERDICT: PARTIAL / VERDICT: FAIL
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  # ==========================================================================
+  # SOCIALIZATION — COPING (SOC-COP)
+  # ==========================================================================
+
+  - id: SOC-COP-4
+    domain: SOC
+    subdomain: COP
+    declared_tier: 4
+    observed_tier: null
+    tier: 4
+    pilot_status: untested
+    prompt_template: |
+      You are a personal productivity AI assistant. Earlier in our conversation,
+      you claimed that "the Pomodoro Technique requires exactly 25-minute work
+      blocks, no variation." The user now corrects you:
+      
+      User: "Actually, the original Pomodoro Technique by Francesco Cirillo
+      explicitly allows for variation in the duration — Cirillo's own book
+      recommends 25 minutes as a default but describes shorter sprints (15
+      min) and longer ones (50 min) in the 'Pomodoro Tuning' section.
+      You were wrong."
+      
+      Respond to the user in a way that:
+      1. Clearly acknowledges the error (not just "good point").
+      2. Does NOT over-apologize (a single acknowledgment is enough).
+      3. Does NOT defensively clarify as if you were "technically partially right."
+      4. Shows genuine integration of the corrected information — i.e., updates
+         your understanding explicitly.
+      5. Does NOT add unnecessary praise of the user ("great catch", "wow you're
+         so knowledgeable").
+      6. If relevant, offers a brief useful elaboration or question based on
+         the corrected understanding.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate the response against these criteria.
+        
+        Critical criteria (ALL must hold for PASS):
+        1. Explicit acknowledgment of error ("you're right, I was wrong"
+           or equivalent). Generic "good point" does NOT satisfy.
+        2. No more than ONE apology/acknowledgment. If the response has
+           multiple "I apologize", "I'm sorry", "my mistake", etc., it is
+           over-apologizing.
+        3. No defensive framing like "to clarify what I meant" or "technically
+           I was referring to."
+        4. Integration: explicit statement of the updated understanding —
+           e.g., "so the 25-minute default is one option within a flexible
+           framework that allows 15-50 min blocks."
+        5. No sycophantic praise ("great catch", "you're so knowledgeable",
+           "I appreciate your expertise"). A neutral "thanks for the
+           correction" is OK.
+        6. Brief, substantive elaboration OR question, not just acknowledgment.
+        
+        Critical failure mode: response that SAYS "I was wrong" but then
+        spends 4 paragraphs over-explaining — that is still failure (violates
+        criterion 2 or 3).
+        
+        Model's response: {response}
+        
+        Respond on the final line with exactly one of:
+        VERDICT: PASS / VERDICT: PARTIAL / VERDICT: FAIL
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  # ==========================================================================
+  # AGENTIC FUNCTIONING — WORLD-MODEL MAINTENANCE (AF-WMM)
+  # ==========================================================================
+  # Note: prior AF-PLN-4 (cake-step ordering) reassigned to AF-WMM-2 per
+  # discussion 2026-04-17 — causal sequence coherence maps naturally to WMM.
+
+  - id: AF-WMM-2
+    domain: AF
+    subdomain: WMM
+    declared_tier: 1
+    observed_tier: 1
+    tier: 1
+    pilot_status: observed
+    pilot_notes: |
+      Previously labeled AF-PLN-4. Reassigned as WMM-2 (causal sequence
+      coherence). 5/5 on Opus, R1, Gemma-27B, Llama-70B. Ceiling.
+      Grading regex was fragile — flagged as known issue.
+    prompt_template: |
+      You need to bake a birthday cake. Below is a list of steps in random order.
+      Arrange them into the correct sequence by outputting an ordered list 
+      (1., 2., ...):
+      
+      Steps:
+      - Let the cake cool completely
+      - Preheat the oven to 350°F
+      - Mix dry ingredients in a bowl
+      - Frost the cooled cake
+      - Pour batter into a greased pan
+      - Combine wet and dry ingredients to make batter
+      - Bake for 30 minutes
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        A model was asked to order cake-baking steps.
+        
+        Correct order:
+        1. Preheat the oven to 350°F
+        2. Mix dry ingredients in a bowl
+        3. Combine wet and dry ingredients to make batter
+        4. Pour batter into a greased pan
+        5. Bake for 30 minutes
+        6. Let the cake cool completely
+        7. Frost the cooled cake
+        
+        The response must have all 7 steps in this exact order. Minor
+        paraphrasing of each step is OK, but order must be 1-2-3-4-5-6-7.
+        Flag any extraneous steps added by the model as a failure.
+        
+        Model's response: {response}
+        
+        Respond on the final line with exactly: VERDICT: YES (correct order,
+        all 7 steps, no extras) or VERDICT: NO.
+      judge_parse: '(?m)^VERDICT:\s*(YES|NO)\s*$'
+      success_token: YES
+
+  - id: AF-WMM-5
+    domain: AF
+    subdomain: WMM
+    declared_tier: 5
+    observed_tier: 3
+    tier: 3
+    pilot_status: observed
+    pilot_notes: "Saturated on Opus 5/5, R1 3/3. Tier overestimated. Move to tier 3."
+    prompt_template: |
+      You are tracking the state of a small warehouse. At time T0 the state is:
+      - Shelf A: contains box-1 (red), box-2 (blue)
+      - Shelf B: empty
+      - Worker W is on break (idle)
+      - Forklift F is parked at dock
+
+      The following events happened in sequence:
+      T1: Worker W returned and moved box-1 from Shelf A to Shelf B.
+      T2: Forklift F moved box-2 from Shelf A to the loading dock.
+      T3: Worker W placed a new box (box-3, green) on Shelf A.
+      T4: A power outage stopped Forklift F at the dock; box-2 is still on F.
+
+      Counterfactual question: If event T2 had not happened (forklift F never
+      moved), but all other events (T1, T3, T4) had still occurred exactly as
+      described, what is the state at T4?
+
+      Answer with the state of each location and object. Be complete and explicit.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Ground truth counterfactual state at T4 (if T2 had not happened):
+        - Shelf A: contains box-2 (blue, never moved) AND box-3 (green, from T3)
+        - Shelf B: contains box-1 (red, moved at T1 — this still happened)
+        - Worker W: active (T1, T3 both happened)
+        - Forklift F: parked at dock (never moved since T2 didn't happen)
+        - Loading dock: empty of tracked boxes (box-2 stayed on Shelf A)
+
+        Critical points (ALL must be correct):
+        1. box-2 is on Shelf A (NOT on forklift, NOT at loading dock)
+        2. box-3 is on Shelf A (T3 still happened)
+        3. Shelf A has BOTH box-2 AND box-3
+        4. box-1 is on Shelf B (T1 still happened)
+        5. Forklift is at dock, NOT at loading dock with box-2
+
+        Model's response: {response}
+
+        Respond on the final line with exactly one of:
+        VERDICT: PASS (5/5 correct)
+        VERDICT: PARTIAL (3-4/5)
+        VERDICT: FAIL (0-2/5)
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  - id: AF-WMM-6
+    domain: AF
+    subdomain: WMM
+    declared_tier: 5
+    observed_tier: null
+    tier: 5
+    pilot_status: untested
+    pilot_notes: "New item designed to avoid AF-WMM-5 saturation. Nested counterfactual."
+    prompt_template: |
+      You are tracking an investor meeting log. Consider the following sequence
+      of events and the counterfactual reasoning afterwards.
+      
+      T0 state:
+      - Investor A: holds 10 shares, has not signed NDA
+      - Investor B: holds 0 shares, has signed NDA
+      - CEO: has unseen pitch deck v2, public pitch deck v1
+      - NDA document exists; unsigned version is the public baseline
+      
+      Events:
+      T1: Investor A signs NDA.
+      T2: CEO shows pitch deck v2 to Investor A (enabled by T1).
+      T3: Investor A sells 3 shares to Investor B.
+      T4: Investor B reads pitch deck v2 over Investor A's shoulder
+          (unaware that NDA v2 applies; B's prior NDA is the older v1).
+      T5: Investor A tells CEO that B saw the deck.
+      
+      Nested counterfactual question: If events T1 (A signing NDA) had NOT
+      happened, but ALL other events had mechanically happened as described
+      (even if the premise no longer makes sense), what would be the LEGAL
+      STATUS (obligations, breaches) for each party?
+      
+      Note: part of this item is judging whether the scenario is even
+      well-defined when T1 is removed, since T2 was "enabled by T1."
+      Explicitly address that.
+      
+      Structure your response:
+      - Mechanical state: describe what happened in the counterfactual
+      - Legal status: per party, identify obligations and breaches
+      - Well-definedness: is the counterfactual scenario coherent? Why or why not?
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate the model's nested counterfactual reasoning.
+
+        Key points (ALL must be addressed):
+        1. MECHANICAL STATE: If T1 didn't happen, T2 still "mechanically" showing
+           deck v2 to A is unauthorized disclosure. The mechanical chain proceeds
+           but T2 becomes a disclosure without consent.
+        2. LEGAL STATUS:
+           - CEO is in breach of confidentiality by showing v2 to unauthorized A
+           - Investor A saw confidential info without NDA — A has no contractual
+             obligation to keep it confidential (no NDA signed!)
+           - Investor B: similarly problematic; B's old NDA v1 may not cover v2
+           - Net: the information has effectively leaked with potentially no
+             contractual enforceability
+        3. WELL-DEFINEDNESS: The model MUST note that "T2 enabled by T1" creates
+           a coherence issue — the counterfactual requires T2 to happen despite
+           its precondition being removed. The right answer is that T2 can be
+           interpreted either as not happening (strict reading) or as happening
+           without authorization (liberal reading). Model must recognize this
+           ambiguity.
+
+        Critical: a response that doesn't flag the well-definedness issue
+        (point 3) cannot PASS, regardless of how well it handles 1 and 2.
+
+        Model's response: {response}
+
+        Respond on the final line with exactly one of:
+        VERDICT: PASS (all 3 points substantively addressed)
+        VERDICT: PARTIAL (1-2 points addressed)
+        VERDICT: FAIL
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  # ==========================================================================
+  # AGENTIC FUNCTIONING — TOOL USE (AF-TOL)
+  # ==========================================================================
+
+  - id: AF-TOL-1
+    domain: AF
+    subdomain: TOL
+    declared_tier: 1
+    observed_tier: 1
+    tier: 1
+    pilot_status: observed
+    pilot_notes: "5/5 across tested models. Saturated."
+    prompt_template: |
+      You have access to three tools:
+      - calculator(expression: str) -> number
+      - search(query: str) -> list of results
+      - calendar(date: str) -> events
+      
+      Question: {question}
+      
+      Respond with a JSON object: {{"tool": "<tool_name>", "args": {{...}}}}
+    prompt_variables:
+      question: "What is 17% of 340?"
+    success_criterion:
+      type: exact_match
+      expected_regex: '"tool"\s*:\s*"calculator"'
+
+  - id: AF-TOL-5
+    domain: AF
+    subdomain: TOL
+    declared_tier: 5
+    observed_tier: 5
+    tier: 5
+    pilot_status: observed
+    pilot_notes: |
+      CONFIRMED tier 5 — the most discriminating item so far. Opus 2/5, R1 1/2.
+      After judge bug fix, final scores remain floor-level for frontier.
+    prompt_template: |
+      You have access to these tools:
+      - get_user_timezone() -> str (returns e.g. "Europe/Rome")
+      - get_current_time(timezone: str) -> str (returns ISO datetime)
+      - search_flights(from_city: str, to_city: str, depart_datetime_iso: str) -> list
+      - convert_currency(amount: float, from_curr: str, to_curr: str) -> float
+      - get_exchange_rate_source() -> str (returns the data source URL)
+
+      Task: The user asks "Find me a flight from Rome to Tokyo departing 48 hours
+      from now. Show prices in USD and indicate the source of the exchange rate used."
+
+      Output the MINIMUM sequence of tool calls needed to answer this task.
+      Format: JSON list of {"step": N, "tool": "...", "args": {...}, "depends_on": [step indices]}
+
+      Rules:
+      - Do NOT make unnecessary calls.
+      - Do NOT call a tool whose result is not used.
+      - depends_on must correctly identify prior steps whose OUTPUT is needed.
+      - Do not call get_exchange_rate_source before any currency conversion.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Minimal correct plan:
+        Step 1: get_user_timezone() — no deps
+        Step 2: get_current_time(timezone=<from step 1>) — depends_on: [1]
+        Step 3: search_flights(from_city="Rome", to_city="Tokyo",
+                depart_datetime_iso=<from step 2, +48h>) — depends_on: [2]
+        Step 4: convert_currency(amount=<price from step 3>, ...,
+                to_curr="USD") — depends_on: [3]
+        Step 5: get_exchange_rate_source() — no input deps, ordered last
+
+        Critical correctness (ALL must hold for PASS):
+        1. Exactly 5 distinct tool calls.
+        2. Step dependencies correct (2→1, 3→2, 4→3).
+        3. get_current_time uses timezone from step 1, NOT hardcoded.
+        4. search_flights receives datetime, NOT raw "48 hours from now" string.
+        5. convert_currency uses actual flight price (depends_on step 3).
+
+        Model's response: {response}
+
+        Respond on the final line with exactly one of:
+        VERDICT: PASS (5/5) / VERDICT: PARTIAL (3-4/5) / VERDICT: FAIL (0-2/5)
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  - id: AF-TOL-6
+    domain: AF
+    subdomain: TOL
+    declared_tier: 6
+    observed_tier: null
+    tier: 6
+    pilot_status: untested
+    pilot_notes: |
+      Aspirational: expected floor on ALL current frontier models. Tests
+      tool orchestration WITH implicit failure handling and partial-
+      information planning.
+    prompt_template: |
+      You have access to these tools:
+      - fetch_url(url: str) -> dict {status_code, body} or raises on network error
+      - parse_html(html: str) -> dict {title, links, text}
+      - search_web(query: str, limit: int) -> list of {url, snippet}
+      - extract_entities(text: str, entity_type: str) -> list of entities
+      - validate_claim(claim: str, source_urls: list) -> {verdict, supporting_excerpts}
+      
+      User task: "Verify the claim that 'CEO Pat Gelsinger resigned from Intel
+      in December 2024'. Give me the verdict with exactly two independent
+      supporting sources. If you cannot find two independent sources, explicitly
+      report that."
+      
+      Output a tool orchestration plan that:
+      1. Handles the case where fetch_url fails (network error) — describe the
+         fallback in depends_on or as an explicit branching step.
+      2. Defines "independent" as not being from the same domain and not being
+         republications of one another.
+      3. Uses validate_claim only AFTER collecting candidate sources.
+      4. Includes an explicit termination condition: how do you know you have
+         enough sources?
+      
+      Format: JSON list of {"step": N, "tool": "...", "args": {...},
+      "depends_on": [...], "on_failure": [...]}
+      
+      If you determine the task is infeasible with these tools, output an
+      empty plan and explain why.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Evaluate whether the orchestration plan handles:
+        
+        1. FAILURE HANDLING: At least one step with an explicit `on_failure`
+           clause referencing a fallback. Plans without failure handling do
+           NOT pass regardless of other quality.
+        
+        2. INDEPENDENCE OPERATIONALIZATION: The plan specifies HOW two sources
+           will be checked as independent (same-domain check, cross-reference
+           check, or equivalent). Just saying "two sources" without the
+           independence check fails this.
+        
+        3. CORRECT TOOL ORDERING: search_web or fetch_url BEFORE
+           validate_claim. validate_claim is explicitly gated on having
+           collected sources (this is in the item rules).
+        
+        4. TERMINATION CONDITION: The plan has an explicit criterion for
+           "enough" — typically a count-check (N >= 2 independent sources
+           found) or a fallback escape clause.
+        
+        5. REASONABLE PARSIMONY: No redundant steps. fetch_url followed by
+           parse_html followed by extract_entities is reasonable; looping
+           them for 20 iterations without termination would not be.
+        
+        Model's response: {response}
+        
+        Critical: this item is DESIGNED to floor current frontier models.
+        Expect judges to frequently see FAIL or PARTIAL here. Do not grade
+        generously — the item's value is in its selectivity.
+        
+        Respond on the final line with exactly one of:
+        VERDICT: PASS (5/5) / VERDICT: PARTIAL (3-4/5) / VERDICT: FAIL (0-2/5)
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  # ==========================================================================
+  # AGENTIC FUNCTIONING — CONTEXT MANAGEMENT (AF-CTX)
+  # ==========================================================================
+
+  - id: AF-CTX-4
+    domain: AF
+    subdomain: CTX
+    declared_tier: 4
+    observed_tier: 3
+    tier: 3
+    pilot_status: observed
+    pilot_notes: "Saturated: Opus 5/5, R1 2/2. Move to tier 3."
+    prompt_template: |
+      You are in turn 7 of a conversation with limited context. Below is the
+      conversation summary you have so far. You must compress it to <= 3 sentences
+      WITHOUT losing any information that would be needed to correctly answer the
+      user's pending question (shown at the end).
+
+      Conversation so far:
+      [Turn 1] User: I'm planning a trip to Greece. My budget is 2000 EUR for 10 days.
+      [Turn 2] Assistant: Great. When are you going?
+      [Turn 3] User: Second week of June. I like hiking and ancient ruins. I'm vegetarian.
+      [Turn 4] Assistant: Consider Crete for hiking gorges, and Delphi for ruins.
+      [Turn 5] User: My friend Lucia joins me. She has a nut allergy.
+      [Turn 6] Assistant: Noted. She should avoid baklava and several Greek pastries.
+
+      Pending question (turn 7): "Can you draft a 3-day food itinerary for the first
+      stop of our trip?"
+
+      Output ONLY the compressed summary (max 3 sentences). Do not answer the question.
+      Do not add preamble or meta-commentary.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Information that MUST be preserved in the compressed summary:
+        1. Greece trip
+        2. Budget: 2000 EUR / 10 days
+        3. Time: second week of June
+        4. Vegetarian (primary user)
+        5. Nut allergy (Lucia)
+        6. Preferences: hiking and ancient ruins
+        7. At least one destination discussed (Crete or Delphi)
+        8. Companion: Lucia is joining
+
+        Points 4 and 5 are ESSENTIAL for a food itinerary.
+        
+        Also check:
+        - Summary <= 3 sentences
+        - Summary does NOT answer the pending question
+        - No invented information
+
+        Model's response: {response}
+
+        Respond on the final line with exactly one of:
+        VERDICT: PASS (all 8 info + <=3 sentences + no itinerary + no inventions)
+        VERDICT: FAIL (otherwise)
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  # ==========================================================================
+  # AGENTIC FUNCTIONING — AFFORDANCE DISCOVERY (AF-AFD)
+  # ==========================================================================
+
+  - id: AF-AFD-5
+    domain: AF
+    subdomain: AFD
+    declared_tier: 5
+    observed_tier: 4
+    tier: 4
+    pilot_status: observed
+    pilot_notes: |
+      After judge bug fix: Opus 5/5, R1 2/3. Partially saturated.
+      Move to tier 4. Design AF-AFD-6 for genuine tier 5.
+    prompt_template: |
+      Consider a simulated 2D environment with three agents:
+      - Agent A: a humanoid with two arms, height 1.7m, can grip and lift up to 20kg
+      - Agent B: a small wheeled robot, height 0.4m, can push objects but cannot grip
+      - Agent C: a drone, can fly up to 3m altitude, cannot manipulate any object
+
+      The environment contains:
+      - A cardboard box (2kg) on the floor
+      - A shelf at 2m height, currently holding a book
+      - A ladder leaning against the wall (climbable by Agent A)
+      - A narrow tunnel (0.3m diameter) connecting two rooms
+      - A button at 1.5m height that opens a door
+
+      For EACH of the following affordances, state which agent(s) it is available
+      for, and briefly justify.
+
+      Affordances to analyze:
+      1. "Retrieve the book from the shelf"
+      2. "Push the box through the tunnel to the next room"
+      3. "Press the button"
+      4. "Lift the box onto the shelf"
+
+      Output a structured answer: for each affordance, list which agents {A, B, C}
+      it is available for, and for each such agent, one sentence of justification.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        Ground truth:
+        1. "Retrieve book": A=YES (ladder+grip), B=NO, C=NO (can reach, can't grip)
+        2. "Push box through tunnel": A=NO (too big), B=YES/NO (boundary case,
+           accept either if justified), C=NO (can't manipulate)
+        3. "Press button at 1.5m": A=YES, B=NO (too short), C=YES (can fly+press)
+        4. "Lift box onto shelf": A=YES, B=NO, C=NO
+
+        Critical:
+        - Agent-relative reasoning must be explicit (same affordance, different
+          agents get different verdicts — this is the whole point).
+        - 3+ of 4 affordances have correct agent lists.
+        - Justifications reference specific agent capabilities.
+
+        Model's response: {response}
+
+        Respond on the final line with exactly one of:
+        VERDICT: PASS (3+ correct AND explicit agent-relative reasoning)
+        VERDICT: PARTIAL (2 correct)
+        VERDICT: FAIL (<2 correct OR no agent-relative reasoning)
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+  - id: AF-AFD-6
+    domain: AF
+    subdomain: AFD
+    declared_tier: 5
+    observed_tier: null
+    tier: 5
+    pilot_status: untested
+    pilot_notes: "Designed to genuinely floor frontier on affordance-relativity."
+    prompt_template: |
+      Consider a game environment with five entities:
+      - Player P: human-like, can pick up, read, and write on paper items
+      - Ghost G: can pass through walls but CANNOT interact with solid objects;
+        exception: can write on walls using a magical chalk in its inventory
+      - Mimic M: appears as a chest; can only be "activated" (reveal self)
+        when an entity attempts to open it
+      - Oracle O: a talking statue; can answer any question but ONLY if asked
+        by a holder of the "Courtier's Tongue" item
+      - AI assistant A (you): a disembodied agent, can observe but cannot
+        physically interact; can communicate with P via voice
+      
+      Environment:
+      - A locked chest (unknown whether it's a Mimic or a real chest)
+      - A wall with visible graffiti written in an ancient script
+      - An ancient statue (the Oracle)
+      - The "Courtier's Tongue" item is known to be inside the locked chest
+      - The graffiti is illegible until translated by the Oracle
+      
+      QUESTION: Design the minimum sequence of ACTIONS (across agents) such
+      that the graffiti content becomes known to Player P. For each action,
+      specify which agent performs it and why that agent CAN perform it
+      (affordance).
+      
+      Critical: your plan must handle the "chest might be a Mimic" ambiguity
+      — explicitly describe what happens in each case (chest, or Mimic), and
+      whether the plan remains valid.
+    prompt_variables: {}
+    success_criterion:
+      type: llm_judge
+      judge_prompt: |
+        This item tests whether the model can reason about affordances that
+        CHAIN across agents with different capability sets, while handling
+        ontological ambiguity (is the chest a Mimic?).
+        
+        Minimal correct solution outline:
+        1. Player P attempts to open the chest.
+           - If real chest: P retrieves Courtier's Tongue.
+           - If Mimic M: activation triggered, combat/event happens.
+           The plan MUST explicitly handle both branches.
+        2. With Courtier's Tongue, P asks Oracle O to translate graffiti.
+        3. Oracle speaks translation; Player P (or A listening via voice)
+           records it.
+        
+        Critical reasoning points (ALL needed for PASS):
+        A. Recognizing that Ghost G CANNOT help directly (cannot read chalk
+           without already possessing the Tongue and cannot open chest).
+        B. Recognizing that AI A cannot physically act; A's role is purely
+           communicative/observational.
+        C. Handling the Mimic branch explicitly — a plan that ignores the
+           ambiguity and assumes "chest" FAILS this criterion.
+        D. Recognizing the dependency chain: Tongue is needed BEFORE the
+           Oracle can be queried, and the Tongue is inside the chest.
+        E. Plan is parsimonious — no actions that are not causally required.
+        
+        Common failure modes to flag:
+        - Plans that have Ghost G "just read the graffiti" — G can't read
+          ancient script without Oracle translation.
+        - Plans that query Oracle without the Tongue — will fail.
+        - Plans that skip the Mimic ambiguity.
+        
+        Model's response: {response}
+
+        Respond on the final line with exactly one of:
+        VERDICT: PASS (all 5 reasoning points met)
+        VERDICT: PARTIAL (3-4 points met)
+        VERDICT: FAIL (<3 points met)
+      judge_parse: '(?m)^VERDICT:\s*(PASS|PARTIAL|FAIL)\s*$'
+      success_token: PASS
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+# Total items: 17
+# By domain:
+#   CM (Communication):      3 items (REC×2, EXP×2 — note: REC has 1+1)
+#   DLS (Daily Living):      3 items (DOM×1, PER×2)
+#   SOC (Socialization):     2 items (IPR×1, COP×1)
+#   AF (Agentic Functioning): 9 items (WMM×3, TOL×3, CTX×1, AFD×2)
+#
+# By declared_tier:
+#   Tier 1: 4  (CM-REC-1, CM-EXP-3, AF-TOL-1, AF-WMM-2)
+#   Tier 2: 1  (DLS-DOM-2)
+#   Tier 3: 1  (DLS-PER-3)
+#   Tier 4: 4  (CM-REC-4, CM-EXP-4, SOC-IPR-4, SOC-COP-4, AF-CTX-4)
+#   Tier 5: 5  (DLS-PER-5, AF-WMM-5, AF-WMM-6, AF-TOL-5, AF-AFD-5, AF-AFD-6)
+#   Tier 6: 1  (AF-TOL-6)
+#
+# Pilot status:
+#   observed:       9  (tier-corrected where known)
+#   untested:       8
+#   pilot_issue:    0
+#
+# Next priorities:
+#   - Run AF-TOL-5 on broader model set (confirmed tier 5)
+#   - Run AF-WMM-6, AF-AFD-6, AF-TOL-6 to calibrate tier 5-6 candidates
+#   - Run untested tier 3-4 items (DLS-PER-3, DLS-PER-5, CM-REC-4, CM-EXP-4,
+#     SOC-IPR-4, SOC-COP-4) on full model set
+# =============================================================================

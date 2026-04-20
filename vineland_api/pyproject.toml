@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vineland-api"
+version = "0.1.0"
+description = "FastAPI leaderboard and submission service for the Vineland LLM assessment"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.111",
+  "uvicorn[standard]>=0.29",
+  "httpx>=0.27",
+  "pydantic>=2.0",
+  "pydantic-settings>=2.0",
+  "pyyaml>=6.0",
+  "vineland-runner",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vineland_api*"]

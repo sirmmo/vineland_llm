@@ -1,0 +1,18 @@
+pilot:
+  name: "pilot_2026_04"
+  agents:
+    - claude-opus-4-5
+    - gpt-5
+    - deepseek-r1
+    - o3
+    - mistral-7b
+    - gemma-27b
+    - llama-70b
+    - gpt-5-reasoning
+  items: "auto"
+  items_per_subdomain: 2
+  n_replications: 5
+  output_dir: "runs/pilot_2026_04"
+  judge_agent: claude-opus-4-5
+  max_concurrency: 4
+  null_success_as_zero: false
