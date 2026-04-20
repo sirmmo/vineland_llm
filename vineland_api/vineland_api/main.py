@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Path, Query
 from fastapi.responses import JSONResponse
 
-from .config import settings
+from .config import settings, _is_vercel
 from .models import (
     AgentSubmission,
     ItemInfo,
@@ -179,6 +179,16 @@ async def submit_model(
     submission: AgentSubmission,
     background_tasks: BackgroundTasks,
 ) -> SubmitResponse:
+    if _is_vercel:
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "Model submission is not supported in serverless mode. "
+                "Background jobs cannot outlive a Vercel function invocation. "
+                "Use the Docker deployment for self-hosted evaluation runs."
+            ),
+        )
+
     from . import worker
 
     job_id = str(uuid.uuid4())
@@ -223,6 +233,8 @@ async def submit_model(
     tags=["Jobs"],
 )
 async def list_jobs() -> list[JobStatus]:
+    if _is_vercel:
+        raise HTTPException(status_code=501, detail="Job tracking is not supported in serverless mode.")
     from . import worker
     return worker.list_jobs()
 
@@ -234,6 +246,8 @@ async def list_jobs() -> list[JobStatus]:
     tags=["Jobs"],
 )
 async def get_job(job_id: Annotated[str, Path(description="Job UUID")]) -> JobStatus:
+    if _is_vercel:
+        raise HTTPException(status_code=501, detail="Job tracking is not supported in serverless mode.")
     from . import worker
     job = worker.get_job(job_id)
     if not job:

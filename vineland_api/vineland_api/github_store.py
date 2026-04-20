@@ -22,6 +22,12 @@ _BASE = "https://api.github.com"
 
 
 def _headers() -> dict[str, str]:
+    if not settings.github_token or not settings.github_repo:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=503,
+            detail="GitHub storage is not configured. Set GITHUB_TOKEN and GITHUB_REPO env vars.",
+        )
     return {
         "Authorization": f"Bearer {settings.github_token}",
         "Accept": "application/vnd.github+json",
