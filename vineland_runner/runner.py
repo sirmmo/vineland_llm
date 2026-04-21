@@ -66,6 +66,7 @@ async def _run_single(
             )
             record.success = grade_result.success
             record.grading_detail = grade_result.detail
+            record.verdict = grade_result.verdict
 
         except Exception as e:
             record.success = None

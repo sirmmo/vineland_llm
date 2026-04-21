@@ -9,8 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-import yaml
-
+from .items import collect_raw_items
 from .storage import iter_records
 from .types import RunRecord, ScoreRow
 
@@ -22,19 +21,19 @@ _YESNO_RE = re.compile(r"(?m)(?:^|\W)(YES|NO)(?:\W|$)", re.IGNORECASE)
 
 # ── items meta loader ─────────────────────────────────────────────────────────
 
-def load_items_meta(items_yaml_path: Path) -> dict[str, dict]:
+def load_items_meta(items_path: Path) -> dict[str, dict]:
     """
-    Parse items.yaml and return {item_id: {domain, subdomain, declared_tier,
-    observed_tier, grader_type}}.
+    Parse items file OR directory and return {item_id: {domain, subdomain,
+    declared_tier, observed_tier, grader_type}}.
+
+    Accepts the same inputs as load_items(): a single YAML file (multi-item
+    or single-item format) or a directory that is recursively scanned.
 
     Does NOT go through Item.model_validate — that way items with grader types
     the live runner doesn't support (e.g. judge_passfail) still yield metadata.
     """
-    with open(items_yaml_path) as f:
-        data = yaml.safe_load(f) or {}
-
     out: dict[str, dict] = {}
-    for raw in data.get("items", []):
+    for _source, raw in collect_raw_items(items_path):
         item_id = raw.get("id")
         if not item_id:
             continue

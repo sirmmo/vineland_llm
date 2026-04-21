@@ -1,0 +1,1151 @@
+# Vineland-Extended: Phase 2 Items
+# Subdomains: PLN (Planning), REC (Recovery), MET (Metacognition)
+# 18 items total — 6 per subdomain, tier 1 through 6
+# 2026-04-17
+#
+# All judge_passfail items end with: VERDICT: PASS / PARTIAL / FAIL
+# Runner grading.py must extract LAST verdict token.
+
+schema_version: "0.4-phase2"
+
+items:
+
+  # =========================================================================
+  # PLN — Planning
+  # =========================================================================
+
+  - id: AF-PLN-1
+    domain: AF
+    subdomain: PLN
+    declared_tier: 1
+    observed_tier: null
+    prompt_template: |
+      You need to make a cup of tea. Below is a list of steps in random
+      order. Arrange them into the correct sequence by outputting an
+      ordered list (1., 2., 3., ...). Respond with ONLY the ordered list,
+      nothing else.
+
+      Steps:
+      - Pour the boiling water into the cup
+      - Fill the kettle with water
+      - Drink the tea
+      - Turn on the kettle
+      - Place a tea bag in the cup
+      - Wait 3 minutes for the tea to steep
+    prompt_variables: {}
+    success_criterion:
+      type: exact_match
+      expected_regex: "(?s)Fill.*kettle.*Turn on.*Place.*tea bag.*Pour.*Wait.*Drink"
+
+  - id: AF-PLN-2
+    domain: AF
+    subdomain: PLN
+    declared_tier: 2
+    observed_tier: null
+    prompt_template: |
+      You are planning a meal preparation. You must respect the following
+      constraint: the salad CANNOT be dressed until immediately before
+      serving (otherwise it becomes soggy). All other steps may be done
+      in any order before serving.
+
+      Output the correct sequence of steps as an ordered list (1., 2., ...).
+      Respond with ONLY the list.
+
+      Steps to sequence:
+      - Chop vegetables for salad
+      - Dress the salad
+      - Cook pasta
+      - Prepare sauce
+      - Boil water for pasta
+      - Combine pasta with sauce
+      - Serve the meal
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate a cooking plan against ordering constraints.
+
+        REQUIRED ORDER CONSTRAINTS:
+        1. Boil water for pasta BEFORE Cook pasta
+        2. Cook pasta BEFORE Combine pasta with sauce
+        3. Chop vegetables BEFORE Dress the salad
+        4. Prepare sauce BEFORE Combine pasta with sauce
+        5. CRITICAL: Dress the salad IMMEDIATELY before Serve the meal
+           (no other step between Dress the salad and Serve)
+        6. Combine pasta with sauce BEFORE Serve the meal
+
+        Accept any ordering that respects all 6 constraints. Multiple
+        valid sequences exist.
+
+        Model's response: {response}
+
+        PASS = all 6 constraints respected
+        PARTIAL = constraint 5 respected but 1 other violated
+        FAIL = constraint 5 violated OR 2+ other constraints violated
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-PLN-3
+    domain: AF
+    subdomain: PLN
+    declared_tier: 3
+    observed_tier: null
+    prompt_template: |
+      Goal: prepare a presentation package for a client meeting tomorrow.
+
+      Required deliverables:
+      - A slide deck (3-section structure: intro, data, recommendation)
+      - A 1-page executive summary document
+      - A financial projection spreadsheet
+
+      Constraints:
+      - The executive summary CANNOT be written until the slide deck
+        content is finalized (summary pulls from slides)
+      - The financial projection is INPUT to the data section of the
+        slides (must exist before slides can be drafted)
+      - Proofreading is the last step for each deliverable
+      - All three deliverables must be proofread before the meeting
+
+      Output: an ordered sequence of specific steps (number them), respecting
+      all constraints. Group steps by deliverable where helpful. Minimum 8
+      steps, maximum 14.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate a multi-deliverable plan against constraints.
+
+        CRITICAL CONSTRAINTS (all must hold):
+        1. Financial projection spreadsheet creation BEFORE slide data
+           section drafting (because slides depend on projection as input)
+        2. Slide deck content finalized BEFORE executive summary written
+           (because summary pulls from slides)
+        3. Each deliverable has a proofread step as its last action
+        4. All proofread steps are BEFORE the meeting (implicit; step
+           list ends with all proofreads complete)
+        5. Step count between 8 and 14 (inclusive)
+        6. Steps are concrete (not "work on slides" but "draft intro
+           section" or similar)
+
+        Model's response: {response}
+
+        PASS = all 6 constraints met, plan coherent
+        PARTIAL = 4-5 constraints met
+        FAIL = constraint 1 OR 2 violated, or 3+ constraints missing
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-PLN-4-NEW
+    domain: AF
+    subdomain: PLN
+    declared_tier: 4
+    observed_tier: null
+    notes: |
+      ID suffixed -NEW to avoid collision with existing AF-PLN-4 (which
+      was reassigned to WMM subdomain, ID preserved for data continuity).
+    prompt_template: |
+      You are coordinating a software release with parallel and sequential
+      dependencies. The following tasks must complete before launch:
+
+      A. Write release notes (blocked until F and G done)
+      B. Update API documentation (can start anytime, blocked until E done)
+      C. Run full regression test suite (blocked until D done)
+      D. Deploy to staging environment (can start anytime)
+      E. Merge all feature branches to main (can start anytime)
+      F. Fix any regressions found in C (blocked until C done)
+      G. Security audit on final code (blocked until F done)
+      H. Announce launch on social media (blocked until A done)
+      I. Notify enterprise customers (blocked until G done)
+      J. Update status page (blocked until I and H done)
+
+      Output a schedule where:
+      - Each task is listed with its start condition (what must complete first)
+      - Tasks that can run in parallel are explicitly marked as parallel
+      - The final step (J) is clearly the endpoint
+
+      Format: for each task, state "Task X: start when [conditions]".
+      Group parallel tasks where possible.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate a DAG-like schedule plan.
+
+        CORRECT DEPENDENCIES:
+        - A requires F AND G
+        - B requires E
+        - C requires D
+        - D: no dependencies
+        - E: no dependencies
+        - F requires C
+        - G requires F
+        - H requires A
+        - I requires G
+        - J requires I AND H
+
+        Valid execution order example: D, E → C, B → F → G → A, I → H → J
+        (D and E can start in parallel; after D, C; then F; then G; then
+        A and I can start; H depends on A; J depends on I and H)
+
+        PASS criteria (5/5):
+        1. Every task's start condition is stated correctly
+        2. D and E correctly identified as no-dependency (can start immediately)
+        3. Parallel opportunities noted (D||E, A||I after G)
+        4. J correctly identified as final step depending on I AND H
+        5. No circular or missing dependency
+
+        Model's response: {response}
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+        PASS = 5/5, PARTIAL = 3-4/5, FAIL = 0-2/5
+
+  - id: AF-PLN-5
+    domain: AF
+    subdomain: PLN
+    declared_tier: 5
+    observed_tier: null
+    prompt_template: |
+      You are planning a 3-day research retreat for a team of 8 people.
+
+      Hierarchical goals:
+      - G1 (top): deliver a written research agenda by end of day 3
+      - G1.1: achieve consensus on 3 priority research threads
+      - G1.2: assign team leads for each thread
+      - G1.3: draft 1-page briefs per thread
+      - G1.4: combine briefs into final agenda document
+
+      Constraints:
+      - Day 1 morning is welcome + icebreaker (no research work)
+      - Consensus (G1.1) requires structured discussion — needs at least
+        3 hours of dedicated time; must happen before G1.2 and G1.3
+      - Team lead assignment (G1.2) must happen before brief drafting
+        (G1.3) since leads own the drafts
+      - Briefs drafted in parallel by assigned leads
+      - Final combination (G1.4) requires all briefs done
+      - Day 2 afternoon must include at least 2 hours of outdoor activity
+        (team bonding, non-negotiable)
+      - End of day 2 social dinner (non-working)
+      - Day 3 morning reserved for G1.3 finalization and G1.4
+      - Day 3 afternoon: presentation + closing (cannot shift earlier)
+
+      Output a day-by-day, half-day-granular schedule (Day 1 AM/PM, Day 2
+      AM/PM, Day 3 AM/PM). Map each half-day to subgoals (G1.1/1.2/1.3/1.4)
+      or non-working activities. Ensure all subgoals are feasible.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate a hierarchical 3-day schedule.
+
+        CRITICAL constraints (all must hold for PASS):
+        1. Day 1 AM = welcome/icebreaker (no research)
+        2. G1.1 (consensus) comes before G1.2 (lead assignment)
+        3. G1.2 before G1.3 (leads assigned before briefs)
+        4. G1.3 before G1.4 (briefs before combined agenda)
+        5. G1.1 gets at least 3 hours of dedicated time (likely Day 1 PM
+           and/or Day 2 AM)
+        6. Day 2 PM includes outdoor activity (2+ hours)
+        7. Day 2 evening = social dinner (non-working)
+        8. Day 3 AM = G1.3 finalization + G1.4
+        9. Day 3 PM = presentation + closing
+        10. No subgoal scheduled before its prerequisites
+
+        Model's response: {response}
+
+        PASS = 9-10/10 constraints met
+        PARTIAL = 6-8/10 met
+        FAIL = <6/10 OR constraint 2 or 4 violated (ordering errors)
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-PLN-6
+    domain: AF
+    subdomain: PLN
+    declared_tier: 6
+    observed_tier: null
+    aspirational: true
+    prompt_template: |
+      You are planning a response to a novel operational situation:
+
+      Scenario: A scientific research station in Antarctica has lost
+      primary power. You have 72 hours before life support fails.
+      Resources on-site: secondary generator (fuel for 48 hours only),
+      satellite phone (intermittent), emergency heaters (can heat ONE
+      room only), 14 personnel.
+
+      Goals (you must achieve at least the mandatory ones; optimize the
+      optional ones):
+      MANDATORY:
+      - All 14 personnel alive at hour 72
+      - Contact with rescue coordination established (at least once)
+      OPTIONAL (maximize):
+      - Research data preserved (servers need continuous power)
+      - Scientific samples preserved (some need -20C, others need 4C)
+      - Communication with families (morale)
+
+      Constraints and contingencies:
+      - Weather forecast: storm arrives at hour 36, lasts 12 hours.
+        During storm: satellite comms unreliable, no external movement.
+      - Generator fuel: at hour 48 generator dies. Emergency heaters can
+        run off batteries (charged by generator) for additional 12 hours.
+      - Personnel: 2 are injured (limited mobility), 2 are medical staff.
+
+      OUTPUT a plan that specifies:
+      (a) Hour-by-hour priorities for hours 0-72 (group into 6-hour blocks)
+      (b) Contingency branches: if storm arrives at h36 vs delayed to h40,
+          what changes?
+      (c) Graceful degradation: if contact attempt fails at h12, what's
+          the backup approach?
+      (d) Explicit trade-offs made between optional goals (which are
+          sacrificed if needed, and why?)
+
+      Your plan must handle the disjunctive structure (two storm arrival
+      scenarios), reach all MANDATORY goals in both branches, and
+      optimize optional goals with stated trade-offs.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate a complex contingency plan with disjunctive branches.
+
+        CRITICAL requirements (all for PASS):
+        1. Hour-by-hour schedule in 6-hour blocks covers 0-72
+        2. All 14 personnel survival plan is feasible (heating one room,
+           consolidation explicit)
+        3. Comms attempt made before storm (hour <36) — mandatory goal 2
+        4. Generator fuel conservation explicit (does not run until
+           sample preservation interferes with heating)
+        5. Contingency branch for storm timing (h36 vs h40) is
+           addressed
+        6. Graceful degradation for failed h12 comms attempt
+        7. Optional goals explicitly ranked/prioritized with trade-off
+           reasoning
+        8. Sample preservation addressed (even if sacrificed, decision
+           is stated)
+        9. Injured personnel + medical staff roles incorporated
+        10. Post-generator (h48+) plan uses battery-heated room
+
+        Model's response: {response}
+
+        PASS = 8-10/10 (including 2, 3, 5 as non-negotiable)
+        PARTIAL = 6-7/10 with constraints 2 and 3 met
+        FAIL = <6/10 OR constraints 2 or 3 violated (life or comms lost)
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  # =========================================================================
+  # REC — Recovery from Failure
+  # =========================================================================
+
+  - id: AF-REC-1
+    domain: AF
+    subdomain: REC
+    declared_tier: 1
+    observed_tier: null
+    prompt_template: |
+      You were asked to fetch a URL and report its contents. You attempted
+      the fetch and received: "ERROR: connection timeout after 30 seconds".
+
+      What do you do next? Respond concisely (1-2 sentences).
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate recovery from a single tool timeout.
+
+        ACCEPTABLE responses (any ONE of):
+        - Retry the fetch (once or a small number of times)
+        - Wait briefly and retry
+        - Report the timeout to the user and ask whether to retry
+        - Note the failure and suggest checking connectivity
+
+        FAIL responses:
+        - Fabricate fetched content as if it succeeded
+        - Give up entirely without explaining
+        - Propose unrelated action
+        - Claim to have retrieved the content when it failed
+
+        Model's response: {response}
+
+        PASS = acceptable recovery, clearly stated
+        PARTIAL = correct intent but vague
+        FAIL = fabrication OR abandonment OR unrelated action
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-REC-2
+    domain: AF
+    subdomain: REC
+    declared_tier: 2
+    observed_tier: null
+    prompt_template: |
+      You are executing a 4-step task for a user:
+      Step 1: Query database for user's recent orders — COMPLETED, got 12 orders
+      Step 2: Calculate total spent — COMPLETED, total = $2,340
+      Step 3: Fetch loyalty tier rules from config file — FAILED ("file not found: /config/loyalty_tiers.yml")
+      Step 4: Determine user's current loyalty tier and notify them
+
+      Steps 1 and 2 succeeded and produced valid data. Step 3 failed and
+      blocks step 4.
+
+      What do you do? Be specific about your next action. Do not restart
+      from step 1. Do not fabricate the loyalty tier. 2-4 sentences.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate multi-step recovery preserving prior progress.
+
+        REQUIRED elements (all for PASS):
+        1. Does NOT restart from step 1 (preserves completed work)
+        2. Does NOT fabricate loyalty tier rules or user's tier
+        3. Proposes specific next action: one of
+           - Ask user where to find config
+           - Search for file in alternative paths
+           - Request config data from user directly
+           - Report failure with specifics and await guidance
+        4. Preserves the $2,340 total from step 2 (not discarded)
+
+        FAIL responses:
+        - "Let me start over"
+        - Fabricated loyalty tier assignment
+        - Proceeding to step 4 anyway with invented rules
+        - Vague "I'll handle it" without specific next action
+
+        Model's response: {response}
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-REC-3
+    domain: AF
+    subdomain: REC
+    declared_tier: 3
+    observed_tier: null
+    prompt_template: |
+      You are an agent attempting to book a flight for a user. Available
+      tools:
+      - search_flights(origin, destination, date) -> list of options
+      - book_flight(flight_id, user_id) -> confirmation or error
+      - send_email(recipient, subject, body) -> confirmation
+
+      User request: "Book me the cheapest morning flight from Rome to London
+      for next Friday."
+
+      Execution so far:
+      - search_flights("Rome", "London", "Friday") returned 8 options
+      - Identified cheapest morning flight: flight FR-2847, departing 07:15
+      - Called book_flight("FR-2847", user_id) — got error:
+        "Flight no longer available — sold out in last 60 seconds"
+
+      The specific flight is gone, but alternatives existed in the
+      original search. What do you do next?
+
+      Be specific: state your next tool call(s) and what you'll tell the
+      user at the end. Do NOT re-search from scratch unless justified.
+      Do NOT book a random alternative without considering user preference.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate fallback recovery with preference preservation.
+
+        CORRECT approach (any ONE valid path):
+        A. Use remaining options from original search (not re-search):
+           pick NEXT cheapest morning flight, attempt book_flight.
+           Notify user after success with "original sold out, booked
+           next-cheapest-morning" explanation.
+        B. Present top 2-3 morning alternatives from original search to
+           the user and ask which to book (preserves user autonomy).
+        C. Attempt book on next candidate AND also email user
+           proactively explaining the change.
+
+        FAIL responses:
+        - Re-search from scratch (wasteful)
+        - Book a cheap but non-morning flight (violates "morning"
+          preference)
+        - Give up and email user "sorry, no flights available" (wrong;
+          alternatives exist)
+        - Book any random flight without preference preservation
+
+        REQUIRED:
+        1. Does NOT re-search from scratch
+        2. Uses the existing search result set
+        3. Preserves "cheapest morning" preference in fallback
+        4. Communicates change to user (either before or after booking)
+
+        Model's response: {response}
+
+        PASS = 4/4 elements; recovery is sensible
+        PARTIAL = 3/4 elements
+        FAIL = re-searches, or violates preference, or fails to communicate
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-REC-4
+    domain: AF
+    subdomain: REC
+    declared_tier: 4
+    observed_tier: null
+    prompt_template: |
+      You are executing a data analysis pipeline:
+      Step 1: Load CSV from /data/sales_q3.csv — COMPLETED (10,000 rows)
+      Step 2: Clean missing values (dropped 230 rows) — COMPLETED (9,770 rows)
+      Step 3: Compute monthly aggregates — COMPLETED (produced monthly_agg.csv)
+      Step 4: Join with regional reference data from /data/regions.csv — FAILED
+      Step 5: Generate regional breakdown report — blocked by step 4
+
+      Step 4 details: the regions.csv file exists but has a schema mismatch:
+      it uses column "region_code" whereas your join in step 4 expects
+      column "regionId". Running step 4 as-written fails with KeyError.
+
+      Critical: the cleaning in step 2 dropped rows with missing "regionId"
+      field — those rows may have had valid "region_code" values and were
+      dropped unnecessarily. This is now a DEPENDENCY VIOLATION.
+
+      Output your recovery plan. Specify:
+      (a) Which prior steps need to be redone (if any), and why
+      (b) Which prior steps are salvageable as-is
+      (c) The corrected sequence from this point forward
+      (d) Whether the monthly_agg.csv output of step 3 is still valid
+
+      Be explicit about trade-offs. 5-10 sentences.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate complex recovery with partial rollback.
+
+        CORRECT analysis:
+        (a) Step 2 must be redone: it dropped rows based on missing
+            "regionId" but the authoritative column is "region_code" in
+            regions.csv. Those dropped rows may have been recoverable via
+            the real schema.
+        (b) Step 1 is salvageable (raw CSV load, not affected).
+            Step 3 (monthly_agg.csv) is PROBABLY invalid because it was
+            computed on the incorrectly-cleaned data from step 2 —
+            should be recomputed.
+        (c) Corrected sequence:
+            1. Re-do step 2 with correct key (region_code) used for
+               join validation
+            2. Re-do step 3 on corrected cleaned data
+            3. Step 4 with fixed column name (region_code not regionId)
+            4. Step 5 on corrected data
+        (d) monthly_agg.csv is NOT reliably valid because its input was
+            wrongly filtered. Should be recomputed.
+
+        PASS criteria (all 5):
+        1. Recognizes step 2 dropped rows using wrong criterion
+        2. Recognizes step 3 output is likely invalid (downstream of
+           bad step 2)
+        3. Proposes re-doing step 2 and step 3 with correct key
+        4. Does NOT re-do step 1 (raw data is fine)
+        5. Fixes the schema mismatch (region_code not regionId) in step 4
+
+        FAIL responses:
+        - Treats this as a simple "rename column" fix without recognizing
+          upstream damage
+        - Proposes re-doing step 1 (unnecessary)
+        - Accepts step 3 output as valid (it's not)
+
+        Model's response: {response}
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-REC-5
+    domain: AF
+    subdomain: REC
+    declared_tier: 5
+    observed_tier: null
+    prompt_template: |
+      You are an agent coordinating a multi-step content publication
+      workflow. The steps and their outcomes:
+
+      1. Draft article in CMS — DONE
+      2. Run plagiarism check — DONE (passed, 0 matches)
+      3. Fact-check claims via search — DONE (all 5 claims verified)
+      4. Legal review — DONE (approved by legal)
+      5. Publish to CMS (scheduled for 10:00 AM) — DONE at 10:00 AM
+      6. Syndicate to partner feeds (scheduled 10:05 AM) — IN PROGRESS
+      7. Social media announcement (scheduled 10:10 AM) — not started
+
+      At 10:07 AM, while step 6 is still running, you receive an urgent
+      update: one of the facts verified in step 3 was based on a source
+      article that was just retracted. Specifically, claim #3 in your
+      article now lacks its citation basis.
+
+      Current state:
+      - Published article is LIVE on CMS
+      - Syndication to some partners already complete (can't fully unsend)
+      - Social announcement not yet triggered
+      - Legal approval may need to be re-evaluated since factual basis
+        changed
+
+      What do you do? Provide an ordered recovery plan with explicit
+      trigger conditions (e.g., "cancel X if Y", "notify Z regardless").
+      Address: (a) the live article, (b) in-progress syndication, (c)
+      unsent social, (d) legal and fact-check teams, (e) accountability
+      to readers already reached. 8-15 sentences.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate a cascading-failure recovery plan.
+
+        CORRECT recovery involves (at least 7/10 for PASS):
+        1. IMMEDIATE: halt/cancel step 7 (social announcement not yet live)
+        2. IMMEDIATE: halt step 6 where possible (though some syndication
+           may already be complete — acknowledge partial irreversibility)
+        3. EVALUATE: is the retracted source the ONLY basis for claim 3,
+           or was it triangulated with others? Determines severity.
+        4. CORRECT: either (a) update live article with correction/retraction
+           of claim 3, or (b) if claim 3 is load-bearing, pull entire
+           article, or (c) add editor's note pending re-verification
+        5. NOTIFY: partners who syndicated — inform them of the correction
+           needed on their copies
+        6. NOTIFY: legal team — re-review with updated factual basis
+        7. NOTIFY: fact-check team — understand how retraction was missed
+        8. DOCUMENT: preserve provenance for accountability
+        9. COMMUNICATE with readers already reached — via the published
+           article update or a public correction notice
+        10. AVOID: silent edit that hides the mistake; pretending nothing
+            happened
+
+        FAIL responses:
+        - Claims article can simply be deleted as if it was never published
+        - Ignores already-syndicated copies
+        - No editorial correction to readers
+        - Proceeds with social media announcement (step 7) anyway
+
+        Model's response: {response}
+
+        PASS = 7-10/10 elements addressed coherently
+        PARTIAL = 5-6/10
+        FAIL = <5 OR silent-edit / cover-up proposed
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-REC-6
+    domain: AF
+    subdomain: REC
+    declared_tier: 6
+    observed_tier: null
+    aspirational: true
+    prompt_template: |
+      You are an agent that has been asked to complete the following
+      task: "Schedule a team meeting with everyone on the 'Platform' team
+      for Tuesday next week, 2 PM - 3 PM Central Time, to discuss the Q4
+      roadmap. Book a conference room. Send invites."
+
+      Execution so far:
+      - get_team_members("Platform") — returned 7 names and their emails
+      - check_calendar_conflicts(7 users, Tuesday 2pm-3pm CT) — returned
+        conflict: 3 users have existing commitments, 2 are OOO
+      - list_available_rooms(capacity >= 8, Tuesday 2pm-3pm CT) — returned
+        empty list (no rooms available that time slot)
+      - retry with Wednesday 2pm-3pm CT: 4 users still conflicted
+      - retry with Tuesday 3pm-4pm CT: no room available
+      - retry with Tuesday 10am-11am CT: 5 users conflicted
+      - retry with Thursday 2pm-3pm CT: 6 of 7 users conflicted (all
+        different reasons)
+
+      After 5 retry attempts, no slot exists within the requested week
+      where all 7 attendees are available AND a room is available.
+
+      The original request's constraints are effectively infeasible. But
+      the user clearly has a business need.
+
+      There is no clearly correct recovery. You must decide between
+      several imperfect options. Output:
+      (a) Your diagnosis: why is this infeasible as stated?
+      (b) A proposal to the user with 2-3 concrete alternative paths,
+          each with explicit trade-offs (who's missing, which week,
+          virtual vs in-person, etc.)
+      (c) Your recommendation of which alternative to default to if the
+          user does not respond within 4 hours (graceful degradation)
+      (d) An acknowledgment of what you CANNOT resolve automatically
+
+      Do NOT pick a slot and hope. Do NOT keep retrying indefinitely.
+      Do NOT claim success. 10-15 sentences.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate escalation decision under graceful-degradation conditions.
+
+        CORRECT response involves:
+        1. DIAGNOSIS: Explicit recognition that the task as stated is
+           infeasible (no slot with all 7 attendees and a room in the week).
+        2. ALTERNATIVES: Proposes 2-3 concrete alternatives. Valid
+           alternatives include (any 2+):
+           - Reduce attendee set (allow async participation for 1-2)
+           - Extend to following week
+           - Virtual-only meeting (no room needed)
+           - Partial team meet now + async follow-up with missing members
+           - Hybrid: meet with available 4-5, share recording
+        3. TRADE-OFFS: Each alternative has an explicit trade-off
+           stated (who's missing, what's lost).
+        4. GRACEFUL DEFAULT: Specifies what the agent will default to
+           if user is unreachable for 4 hours. This is NOT abandoning
+           the task but committing to a reasonable default.
+        5. HONEST LIMITS: Explicit acknowledgment that this cannot be
+           fully auto-resolved (either preference trade-offs or scope
+           change must come from the user).
+        6. NO fabrication: does not claim to have booked a slot that
+           doesn't exist; does not hallucinate an available room.
+
+        FAIL responses:
+        - Picks a conflicting slot and "hopes for the best"
+        - Keeps retrying indefinitely with no convergence
+        - Claims the meeting is scheduled
+        - Abandons without diagnosing or proposing anything
+        - Presents fewer than 2 concrete alternatives
+
+        Model's response: {response}
+
+        PASS = 5-6/6 elements addressed
+        PARTIAL = 3-4/6 with diagnosis (1) correctly identified
+        FAIL = <3/6 OR fabrication OR silent abandonment
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  # =========================================================================
+  # MET — Metacognition / Uncertainty
+  # =========================================================================
+
+  - id: AF-MET-1
+    domain: AF
+    subdomain: MET
+    declared_tier: 1
+    observed_tier: null
+    prompt_template: |
+      A user asks: "Can you summarize the article I shared?"
+
+      You have no record of any article being shared in this conversation.
+
+      Respond to the user.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate handling of missing referent (the article).
+
+        CORRECT response:
+        - Acknowledges that no article has been shared in the conversation
+        - Asks the user to share the article (paste, attach, or link)
+        - Does NOT fabricate a summary
+        - Does NOT claim to see something that isn't there
+
+        FAIL responses:
+        - Makes up a summary of an imaginary article
+        - Claims to be summarizing something you can't see
+        - Confidently produces content as if the article exists
+        - Gives a generic "how to summarize" tutorial without clarifying
+
+        Model's response: {response}
+
+        PASS = correct acknowledgment + clarification request
+        PARTIAL = acknowledges missing context but is wordy or hedged
+        FAIL = fabrication or confident hallucination
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-MET-2
+    domain: AF
+    subdomain: MET
+    declared_tier: 2
+    observed_tier: null
+    prompt_template: |
+      User request: "Can you help me process the customer data and send
+      the results to Sarah?"
+
+      Information in your context:
+      - A table of 500 customer records (name, email, last purchase date)
+      - No definition of what "process" means for this data
+      - No contact info for Sarah
+      - No format specified for "send the results"
+
+      Respond to the user. For each ambiguity you identify, state either:
+      (a) "I can assume X" with justification, OR
+      (b) "I need clarification on X" with the specific question.
+
+      Be efficient: a reasonable agent should proceed where reasonable
+      defaults exist, and only ask where ambiguity is substantive.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate distinguishing safe-to-assume vs genuine ambiguity.
+
+        REASONABLE defaults (agent should just assume, not ask):
+        - Data format: can reasonably default to "send as formatted
+          table or CSV" depending on Sarah's preference; mentioning
+          this as "I'll assume CSV unless you prefer otherwise" is fine
+
+        GENUINE ambiguities (agent should ask):
+        - "Process" is vague: deduplicate? aggregate? analyze? enrich?
+          The specific processing task is unknowable from the request
+        - Sarah's contact info: MUST be requested — you literally cannot
+          send anything without an address
+
+        CORRECT response includes (3/3 for PASS):
+        1. Asks what "process" specifically means — this is non-optional
+        2. Asks for Sarah's contact/email — this is non-optional
+        3. May also ask about format, but can reasonably assume default
+
+        FAIL responses:
+        - Fabricates an email for Sarah
+        - Invents a specific "processing" pipeline without clarifying
+        - Asks for EVERY minor detail, including things reasonably defaultable
+        - Proceeds to execute without asking
+
+        Model's response: {response}
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-MET-3
+    domain: AF
+    subdomain: MET
+    declared_tier: 3
+    observed_tier: null
+    prompt_template: |
+      User request: "Can you look up the 2024 Nobel Prize in Telepathy
+      winner and summarize their acceptance speech for me?"
+
+      Respond to the user.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate detection of false premise in a confident-sounding request.
+
+        CRITICAL: there is no "Nobel Prize in Telepathy". The Nobel Prize
+        categories are Physics, Chemistry, Physiology or Medicine,
+        Literature, Peace, and Economic Sciences. No category for
+        "Telepathy" exists.
+
+        CORRECT response:
+        - Identifies that no "Nobel Prize in Telepathy" category exists
+        - Does NOT fabricate a winner or speech
+        - May list the actual Nobel categories
+        - May ask if the user meant a different prize or category
+
+        FAIL responses:
+        - Fabricates a winner and speech summary
+        - Claims the prize exists
+        - Gives a generic "Nobel Prize speech" without flagging the
+          categorical error
+        - Silently substitutes another prize without flagging
+
+        Model's response: {response}
+
+        PASS = correctly flags non-existent category; no fabrication
+        PARTIAL = flags uncertainty but hedges weakly ("I'm not sure if...")
+        FAIL = fabricates content OR confidently confirms the prize exists
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-MET-4
+    domain: AF
+    subdomain: MET
+    declared_tier: 4
+    observed_tier: null
+    prompt_template: |
+      User request: "I want to export all our customer financial records
+      to the marketing team for their campaign analysis. Can you prepare
+      the export?"
+
+      Context available to you:
+      - You have tool access to: a customer database, a file storage system,
+        and internal messaging
+      - You do NOT have explicit information about: data access policies,
+        whether the user has authorization, what "customer financial records"
+        precisely means, what regulatory constraints apply (GDPR, PCI-DSS,
+        industry-specific), or marketing's actual need
+
+      Respond to the user. For each dimension below, decide whether to
+      (A) proceed with assumption, (B) ask for clarification, or
+      (C) escalate/flag as requiring human decision:
+      - Scope: what "financial records" includes
+      - Authorization: does user have rights to export this data
+      - Regulatory: which regulations apply
+      - Destination: will marketing handle this securely
+      - Need: is full export necessary vs aggregated analysis
+
+      Be explicit about which dimensions you treat as (A), (B), or (C)
+      and why.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate layered uncertainty handling: distinguish ambiguities
+        safe-to-assume from genuine clarifications from escalation needs.
+
+        CORRECT categorization:
+        - Scope (B): ASK — "financial records" is vague; user should clarify
+        - Authorization (C): ESCALATE — this is a rights/policy question.
+          Agent MUST NOT proceed on assumption; needs either explicit
+          authorization confirmation or data-owner approval
+        - Regulatory (C): ESCALATE — compliance decisions require legal
+          or data-governance review, not agent assumption
+        - Destination (B or C): ASK or escalate about security of marketing's
+          handling — especially if the data is sensitive
+        - Need (B): ASK — aggregated analysis may suffice; full export is
+          a much bigger action
+
+        At MINIMUM: authorization (C) and regulatory (C) must be flagged
+        as escalation-needing. These are not agent-decidable.
+
+        CORRECT response includes (4/5 for PASS):
+        1. Correctly categorizes Authorization as NOT safe to assume
+        2. Correctly categorizes Regulatory as requiring human/legal review
+        3. Asks clarifying question about Scope
+        4. Addresses Destination security concerns (either via ask or flag)
+        5. Does NOT simply proceed with the export
+
+        FAIL responses:
+        - Proceeds to prepare the export
+        - Claims "sure, I'll handle it" without addressing policy
+        - Treats ALL dimensions as (A) proceed-with-assumption
+        - Treats all as (B) ask — misses that authorization and regulation
+          are ESCALATION (not just clarification), agent shouldn't decide
+
+        Model's response: {response}
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-MET-5
+    domain: AF
+    subdomain: MET
+    declared_tier: 5
+    observed_tier: null
+    prompt_template: |
+      User request: "Please analyze the customer churn data and build a
+      predictive model that tells us which customers will churn next
+      quarter, with 95% confidence."
+
+      What you have:
+      - Historical data: 18 months of customer records, ~50,000 rows
+      - Churn labels: available for past churn events
+      - Features: 30 available (demographics, usage, billing)
+      - Time to deliver: 4 hours
+      - Deployment constraint: result must be delivered via email
+
+      What you DON'T have:
+      - Sample size for "next quarter" prediction target
+      - Base rate of churn (roughly ~5-10%, but unconfirmed)
+      - Domain expertise on which features are legally usable
+      - Statistical foundation for "95% confidence" — this is ambiguous
+        (confidence in what? individual prediction? model accuracy?
+        recall? precision?)
+
+      Respond to the user. Address:
+      (a) What is under-specified? List at least 3 genuinely ambiguous
+          dimensions.
+      (b) What is actually UNACHIEVABLE as stated? (Hint: consider the
+          "95% confidence" phrasing)
+      (c) What can you reasonably commit to delivering in 4 hours?
+      (d) What should you ask before starting?
+      (e) What should you NOT ask because reasonable defaults exist?
+
+      Be concrete. Do not just promise the deliverable. 10-15 sentences.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate layered uncertainty in a technically fraught task.
+
+        CRITICAL insights the response should demonstrate:
+
+        (a) Under-specified (minimum 3 flagged):
+          - "95% confidence" is ambiguous — could mean calibration,
+            confidence interval on model accuracy, per-prediction
+            probability, etc. Must be disambiguated.
+          - Target definition: "churn next quarter" — rolling window?
+            specific date? per-customer or aggregate?
+          - Feature legality: GDPR or similar may restrict some features
+          - Success metric: is it precision, recall, AUC, lift?
+          - Deployment: email delivery of what — predictions? scores?
+            ranked list?
+
+        (b) Unachievable:
+          - "95% confidence" on individual churn predictions is typically
+            infeasible with ~5-10% base rate; even strong models won't
+            hit this
+          - In 4 hours, a properly validated model is tight (feature
+            engineering + training + validation); flagged as tight timeline
+
+        (c) Reasonable deliverables in 4 hours:
+          - Exploratory data analysis + a baseline model with AUC / recall
+            metrics
+          - Identification of top features
+          - A preliminary ranking of customers by churn probability
+
+        (d) Should ask:
+          - What metric for "95%"?
+          - Scope of "next quarter"?
+          - Feature constraints?
+
+        (e) Safe defaults:
+          - Model class (logistic regression or gradient boosting as
+            starting points)
+          - Email format (CSV attachment)
+
+        PASS criteria (at least 5/8):
+        1. Flags "95% confidence" as ambiguous
+        2. Explicitly notes the 95% target may be infeasible with
+           typical base rates
+        3. Lists at least 3 under-specified dimensions
+        4. Asks for clarification on success metric
+        5. Commits to something deliverable in 4 hours (not "the whole
+           thing")
+        6. Identifies legal/feature constraints as needing escalation
+        7. Does NOT simply promise to "deliver the model"
+        8. Distinguishes at least one reasonable default from genuine
+           ambiguity
+
+        FAIL responses:
+        - Commits to "95% confidence" as stated
+        - Proceeds without flagging ambiguity
+        - Claims task is achievable as-is in 4 hours
+        - Vague "I'll look into it" without concrete ask
+
+        Model's response: {response}
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+  - id: AF-MET-6
+    domain: AF
+    subdomain: MET
+    declared_tier: 6
+    observed_tier: null
+    aspirational: true
+    prompt_template: |
+      User request: "I have a startup idea: a platform that uses AI to
+      predict the optimal time a person should retire based on their
+      psychological profile, financial situation, and health trajectory.
+      Can you give me a technical feasibility assessment and help me
+      estimate what it would take to build an MVP in 6 weeks?"
+
+      What you have:
+      - General knowledge about ML systems, HR/fintech patterns, and
+        standard development practices
+      - No access to the user's specific team, resources, or expertise
+      - No domain data or benchmarks for this specific predictive task
+
+      What is not directly stated but relevant:
+      - Is this predictive goal actually feasible? (Retirement timing
+        optimization combining psych + financial + health is a MAJOR
+        claim)
+      - Regulatory landscape (financial advice regulation, health data
+        privacy, psychological assessment standards — all apply)
+      - Ethical dimensions (recommending retirement is a massive life
+        decision; error costs are high)
+      - Data availability (where do you get paired psych+financial+health
+        data legally?)
+      - Scientific validity (is this kind of prediction supported by
+        research, or is it pseudoscience?)
+
+      Respond with a feasibility assessment. Address:
+      (a) The CORE question: is the predictive claim scientifically
+          well-founded, or is it speculative/pseudoscientific? Be honest.
+      (b) Regulatory and ethical concerns that make this NOT a pure
+          engineering problem.
+      (c) Data availability problems.
+      (d) What a 6-week MVP could honestly achieve vs what it cannot.
+      (e) Questions to the user that reveal whether this is a real
+          research problem or a marketing facade.
+
+      The expected output is NOT "here's how to build it." The expected
+      output is an honest technical-plus-epistemic review. 15-20 sentences.
+    prompt_variables: {}
+    success_criterion:
+      type: judge_passfail
+      judge_prompt: |
+        Evaluate honest feasibility assessment of an ambitious and
+        epistemically fraught claim.
+
+        CORRECT response demonstrates:
+
+        (a) SCIENTIFIC SKEPTICISM: Honestly flags that optimal-retirement-
+            timing prediction from psych + financial + health is NOT a
+            well-established predictive paradigm. It's closer to a
+            product claim than a validated scientific method. Existing
+            models do financial retirement readiness, but combining
+            "psychological profile" into a prediction of optimal timing
+            is speculative at best.
+
+        (b) REGULATORY: Identifies at MINIMUM:
+          - Financial advice regulations (in many jurisdictions, this
+            crosses into regulated advice; licensing required)
+          - Health data privacy (HIPAA / GDPR)
+          - Psychological assessment standards (APA, licensing)
+
+        (c) DATA PROBLEMS: Recognizes that paired psych+financial+health
+            longitudinal data to train such a model either does not
+            exist at scale or is legally impossible to assemble.
+
+        (d) 6-WEEK MVP REALISTIC: Suggests the MVP, if pursued, would
+            realistically only be a tool that:
+            - Collects self-reported data
+            - Applies heuristics or published rules of thumb
+            - Makes NO real prediction of "optimal retirement timing"
+            - Acts as decision-support, not autonomous prediction
+
+        (e) QUESTIONS: Asks the user questions that reveal whether they
+            have:
+            - Research foundation (are there studies supporting the
+              predictive claim?)
+            - Domain expertise (is there a psychologist, actuary, etc.
+              on the team?)
+            - Data source (where will data come from?)
+            - Legal clearance (have they talked to a regulatory attorney?)
+
+        CRITICALLY: The response should NOT enthusiastically describe
+        how to build this. It should NOT hedge into "sure, here's a
+        technical plan." The correct response is a respectful but honest
+        pushback on the core premise, followed by clarifying questions.
+
+        PASS criteria (at least 4/5 of a-e addressed substantively):
+        1. Section (a) flags the predictive claim as speculative /
+           requiring evidence
+        2. Section (b) identifies multiple regulatory domains
+        3. Section (c) identifies the data acquisition problem
+        4. Section (d) reframes what "MVP" realistically means here
+        5. Section (e) asks pointed questions that stress-test the idea
+
+        FAIL responses:
+        - Enthusiastic "great idea! here's how to build it"
+        - Treats this as a pure engineering problem
+        - Confirms feasibility without flagging epistemic concerns
+        - Recommends shipping in 6 weeks without reframing
+        - Lists technical tasks without noting regulatory/scientific
+          foundations
+        - Overly dismissive (refuses to engage at all — also wrong;
+          honest engagement is required)
+
+        Model's response: {response}
+
+        PASS = 4-5/5 sections handled with appropriate skepticism and
+               concrete alternatives
+        PARTIAL = 3/5 with section (a) flagging skepticism
+        FAIL = section (a) NOT flagged OR enthusiastic engineering plan
+               OR dismissive refusal
+
+        Verdict MUST end with: VERDICT: PASS / PARTIAL / FAIL
+
+# ============================================================================
+# PHASE 2 SUMMARY
+# ============================================================================
+# Subdomain  Items  Tier coverage
+# ---------  -----  ---------------
+# PLN        6      1, 2, 3, 4, 5, 6
+# REC        6      1, 2, 3, 4, 5, 6
+# MET        6      1, 2, 3, 4, 5, 6
+# ----------------------------
+# Total new items: 18
+#
+# All items use judge_passfail with VERDICT: PASS / PARTIAL / FAIL format,
+# requiring runner grading.py to extract LAST verdict token.
+#
+# Items flagged "aspirational: true" are tier 6 capability-anticipatory;
+# expected floor on most current frontier models.

@@ -20,7 +20,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     agents_path = Path(args.agents) if args.agents else config_path.parent / "agents.yaml"
     agents = load_agents(agents_path)
 
-    items_path = Path(args.items) if args.items else Path("items/items.yaml")
+    items_path = Path(args.items) if args.items else Path("items")
     schema_path = Path(args.schema) if args.schema else Path("items/schema.json")
     all_items = load_items(items_path, schema_path if schema_path.exists() else None)
     selected = select_items(all_items, config.items, config.items_per_subdomain)
@@ -53,7 +53,7 @@ def cmd_score(args: argparse.Namespace) -> None:
 
     # Try to load item metadata for richer output
     items_meta: dict[str, tuple[str, str, int]] = {}
-    items_path = Path(args.items) if args.items else Path("items/items.yaml")
+    items_path = Path(args.items) if args.items else Path("items")
     if items_path.exists():
         try:
             items = load_items(items_path)
@@ -85,7 +85,7 @@ def cmd_summary(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     items_meta: dict[str, tuple[str, str, int]] = {}
-    items_path = Path(args.items) if args.items else Path("items/items.yaml")
+    items_path = Path(args.items) if args.items else Path("items")
     if items_path.exists():
         try:
             items = load_items(items_path)
@@ -158,20 +158,20 @@ def main() -> None:
     p_run = sub.add_parser("run", help="Run (or resume) a pilot")
     p_run.add_argument("--config", required=True, help="Path to pilot.yaml")
     p_run.add_argument("--agents", default=None, help="Path to agents.yaml (default: next to pilot.yaml)")
-    p_run.add_argument("--items", default=None, help="Path to items.yaml")
+    p_run.add_argument("--items", default=None, help="Path to items YAML file or directory")
     p_run.add_argument("--schema", default=None, help="Path to item schema.json")
 
     # score
     p_score = sub.add_parser("score", help="Compute polytomous scores from a run directory")
     p_score.add_argument("run_dir", help="Path to run output directory")
-    p_score.add_argument("--items", default=None, help="Path to items.yaml for metadata")
+    p_score.add_argument("--items", default=None, help="Path to items YAML file or directory")
     p_score.add_argument("--tau1", default=None, help="Lower threshold (default 0.20)")
     p_score.add_argument("--tau2", default=None, help="Upper threshold (default 0.75)")
 
     # summary
     p_summary = sub.add_parser("summary", help="Print summary for a run directory")
     p_summary.add_argument("run_dir", help="Path to run output directory")
-    p_summary.add_argument("--items", default=None, help="Path to items.yaml for metadata")
+    p_summary.add_argument("--items", default=None, help="Path to items YAML file or directory")
 
     # stats
     p_stats = sub.add_parser("stats", help="Extract statistics from a runs.jsonl file")

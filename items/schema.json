@@ -3,7 +3,11 @@
   "$id": "vineland-item",
   "title": "VinelandItem",
   "type": "object",
-  "required": ["id", "domain", "subdomain", "tier", "prompt_template", "success_criterion"],
+  "required": ["id", "domain", "subdomain", "prompt_template", "success_criterion"],
+  "anyOf": [
+    {"required": ["tier"]},
+    {"required": ["declared_tier"]}
+  ],
   "properties": {
     "id": {
       "type": "string",
@@ -24,7 +28,19 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 8,
-      "description": "Capability-tier band (1=easiest, 5=hardest)"
+      "description": "Capability-tier band (1=easiest, 8=hardest). Falls back to declared_tier."
+    },
+    "declared_tier": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8,
+      "description": "Tier assigned at item authoring time."
+    },
+    "observed_tier": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "maximum": 8,
+      "description": "Empirically-observed difficulty tier (from pilot data)."
     },
     "prompt_template": {
       "type": "string",
@@ -61,6 +77,26 @@
             "judge_prompt": {"type": "string"},
             "judge_parse": {"type": "string"}
           }
+        },
+        {
+          "type": "object",
+          "required": ["type", "judge_prompt"],
+          "properties": {
+            "type": {"type": "string", "const": "judge_yesno"},
+            "judge_prompt": {"type": "string"},
+            "judge_parse": {"type": "string"}
+          },
+          "description": "Judge extracts first YES/NO. success = (verdict == YES)."
+        },
+        {
+          "type": "object",
+          "required": ["type", "judge_prompt"],
+          "properties": {
+            "type": {"type": "string", "const": "judge_passfail"},
+            "judge_prompt": {"type": "string"},
+            "judge_parse": {"type": "string"}
+          },
+          "description": "Judge extracts last PASS|PARTIAL|FAIL. success = (verdict == PASS)."
         }
       ]
     }

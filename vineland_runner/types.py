@@ -23,7 +23,26 @@ class LLMJudgeCriterion(BaseModel):
     judge_parse: str  # regex pattern; match → success
 
 
-SuccessCriterion = Union[ExactMatchCriterion, LLMJudgeCriterion]
+class JudgeYesNoCriterion(BaseModel):
+    """Judge extracts first YES/NO token. success = (verdict == 'YES')."""
+    type: Literal["judge_yesno"]
+    judge_prompt: str
+    judge_parse: Optional[str] = None  # optional override; default = first YES|NO
+
+
+class JudgePassFailCriterion(BaseModel):
+    """Judge extracts LAST PASS|PARTIAL|FAIL token. success = (verdict == 'PASS')."""
+    type: Literal["judge_passfail"]
+    judge_prompt: str
+    judge_parse: Optional[str] = None  # optional override; default = last PASS|PARTIAL|FAIL
+
+
+SuccessCriterion = Union[
+    ExactMatchCriterion,
+    LLMJudgeCriterion,
+    JudgeYesNoCriterion,
+    JudgePassFailCriterion,
+]
 
 
 class Item(BaseModel):
@@ -31,9 +50,21 @@ class Item(BaseModel):
     domain: str
     subdomain: str
     tier: int = Field(ge=1, le=8)
+    declared_tier: Optional[int] = Field(default=None, ge=1, le=8)
+    observed_tier: Optional[int] = Field(default=None, ge=1, le=8)
     prompt_template: str
     prompt_variables: dict[str, str] = Field(default_factory=dict)
     success_criterion: SuccessCriterion = Field(discriminator="type")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_tier_from_declared(cls, data: Any) -> Any:
+        """Accept items that specify only declared_tier (phase-2 style)."""
+        if not isinstance(data, dict):
+            return data
+        if "tier" not in data and data.get("declared_tier") is not None:
+            data = {**data, "tier": data["declared_tier"]}
+        return data
 
     def rendered_prompt(self) -> str:
         result = self.prompt_template

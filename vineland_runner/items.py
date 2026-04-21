@@ -1,4 +1,12 @@
-"""Item loader with JSON Schema validation."""
+"""Item loader with JSON Schema validation.
+
+`load_items()` accepts either a YAML file or a directory. In directory mode,
+every `*.yaml` / `*.yml` under the path is scanned (recursively). Files may
+contain either the multi-item format (top-level `items:` list) or a single-
+item format (top-level `id:` with the item fields). Unrelated YAML files
+(no `items:` and no `id:`) are silently ignored — that way spec docs can
+live alongside item files without interfering.
+"""
 from __future__ import annotations
 
 import json
@@ -17,6 +25,57 @@ def _load_schema(schema_path: Path) -> dict[str, Any]:
         return json.load(f)
 
 
+def _load_one_yaml(path: Path) -> list[dict]:
+    """Return raw item dicts from a single YAML file.
+
+    Supports two formats:
+      - {items: [...]}   — multi-item file
+      - {id: ..., ...}   — single-item file
+    Anything else returns an empty list (safely skipped).
+    """
+    with open(path) as f:
+        data = yaml.safe_load(f) or {}
+    if not isinstance(data, dict):
+        return []
+    if "items" in data:
+        raw = data.get("items") or []
+        return list(raw)
+    if "id" in data:
+        return [data]
+    return []
+
+
+def _yaml_files(root: Path) -> list[Path]:
+    """Recursively list *.yaml / *.yml files under root, sorted, skipping hidden."""
+    files: set[Path] = set()
+    for pat in ("*.yaml", "*.yml"):
+        files.update(root.rglob(pat))
+    return sorted(f for f in files if not f.name.startswith("."))
+
+
+def collect_raw_items(items_path: Path) -> list[tuple[Path, dict]]:
+    """Walk a file or directory and return [(source_path, raw_item_dict), ...].
+
+    Accepts a single file or a directory. Directory mode loads every
+    *.yaml/*.yml under it (recursively). Ordering is deterministic
+    (sorted paths, file order preserved).
+    """
+    if not items_path.exists():
+        raise FileNotFoundError(f"Items path not found: {items_path}")
+
+    sources: list[Path]
+    if items_path.is_file():
+        sources = [items_path]
+    else:
+        sources = _yaml_files(items_path)
+
+    out: list[tuple[Path, dict]] = []
+    for source in sources:
+        for raw in _load_one_yaml(source):
+            out.append((source, raw))
+    return out
+
+
 def load_items(
     items_path: Path,
     schema_path: Path | None = None,
@@ -26,24 +85,30 @@ def load_items(
 
     schema = _load_schema(schema_path) if schema_path.exists() else None
 
-    with open(items_path) as f:
-        data = yaml.safe_load(f)
-
-    raw_items = data.get("items", [])
     items: list[Item] = []
     errors: list[str] = []
+    seen_ids: dict[str, Path] = {}
 
-    for raw in raw_items:
+    for source, raw in collect_raw_items(items_path):
+        item_id = raw.get("id", "?")
+        if item_id in seen_ids and item_id != "?":
+            errors.append(
+                f"Duplicate item id {item_id!r}: {seen_ids[item_id]} and {source}"
+            )
+            continue
+        if item_id != "?":
+            seen_ids[item_id] = source
+
         if schema is not None:
             try:
                 jsonschema.validate(raw, schema)
             except jsonschema.ValidationError as e:
-                errors.append(f"Item {raw.get('id', '?')} schema error: {e.message}")
+                errors.append(f"[{source}] Item {item_id} schema error: {e.message}")
                 continue
         try:
             items.append(Item.model_validate(raw))
         except ValidationError as e:
-            errors.append(f"Item {raw.get('id', '?')} pydantic error: {e}")
+            errors.append(f"[{source}] Item {item_id} pydantic error: {e}")
 
     if errors:
         raise ValueError("Item load errors:\n" + "\n".join(errors))
