@@ -1,0 +1,16 @@
+services:
+  pilot:
+    build: .
+    image: vineland-runner:latest
+    container_name: vineland-pilot
+    env_file:
+      - .env
+    volumes:
+      - ./runs:/app/runs
+      - ./items:/app/items:ro
+      - ./configs:/app/configs:ro
+    working_dir: /app
+    # Default command from Dockerfile: vineland-runner run --config configs/pilot.yaml
+    # Override at the CLI for one-shot ops, e.g.:
+    #   docker compose run --rm pilot score runs/pilot_2026_04
+    #   docker compose run --rm pilot summary runs/pilot_2026_04

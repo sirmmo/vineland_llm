@@ -31,7 +31,7 @@ pilot:
     - zephyr-7b-free
     - gemma-4-31b-it-free
     - gemma-4-26b-a4b-it-free
-  items: "auto"
+  items: "all"
   items_per_subdomain: 2
   n_replications: 5
   output_dir: "runs/pilot_2026_04"

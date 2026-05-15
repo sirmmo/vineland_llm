@@ -1,0 +1,11 @@
+pilot:
+  name: "smoke"
+  agents:
+    - claude-opus-4-5
+  items:
+    - AF-TOL-1
+  n_replications: 1
+  output_dir: "runs/smoke"
+  judge_agent: claude-opus-4-5
+  max_concurrency: 1
+  null_success_as_zero: false
