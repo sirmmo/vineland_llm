@@ -1,0 +1,9 @@
+id: mistral-7b-instruct-v0.3
+display_name: Mistral 7B Instruct v0.3
+base_url: https://openrouter.ai/api/v1
+model_id: mistralai/mistral-7b-instruct-v0.3
+api_key_env: OPENROUTER_API_KEY
+max_tokens: 2048
+temperature: 0.7
+reasoning: false
+notes: small open model, pinned v0.3

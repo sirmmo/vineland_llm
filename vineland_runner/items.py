@@ -13,10 +13,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-import yaml
 import jsonschema
 from pydantic import ValidationError
 
+from ._yaml_sources import collect_entries
 from .types import Item
 
 
@@ -25,55 +25,9 @@ def _load_schema(schema_path: Path) -> dict[str, Any]:
         return json.load(f)
 
 
-def _load_one_yaml(path: Path) -> list[dict]:
-    """Return raw item dicts from a single YAML file.
-
-    Supports two formats:
-      - {items: [...]}   — multi-item file
-      - {id: ..., ...}   — single-item file
-    Anything else returns an empty list (safely skipped).
-    """
-    with open(path) as f:
-        data = yaml.safe_load(f) or {}
-    if not isinstance(data, dict):
-        return []
-    if "items" in data:
-        raw = data.get("items") or []
-        return list(raw)
-    if "id" in data:
-        return [data]
-    return []
-
-
-def _yaml_files(root: Path) -> list[Path]:
-    """Recursively list *.yaml / *.yml files under root, sorted, skipping hidden."""
-    files: set[Path] = set()
-    for pat in ("*.yaml", "*.yml"):
-        files.update(root.rglob(pat))
-    return sorted(f for f in files if not f.name.startswith("."))
-
-
 def collect_raw_items(items_path: Path) -> list[tuple[Path, dict]]:
-    """Walk a file or directory and return [(source_path, raw_item_dict), ...].
-
-    Accepts a single file or a directory. Directory mode loads every
-    *.yaml/*.yml under it (recursively). Ordering is deterministic
-    (sorted paths, file order preserved).
-    """
-    if not items_path.exists():
-        raise FileNotFoundError(f"Items path not found: {items_path}")
-
-    sources: list[Path]
-    if items_path.is_file():
-        sources = [items_path]
-    else:
-        sources = _yaml_files(items_path)
-
-    out: list[tuple[Path, dict]] = []
-    for source in sources:
-        for raw in _load_one_yaml(source):
-            out.append((source, raw))
-    return out
+    """Walk a file or directory and return [(source_path, raw_item_dict), ...]."""
+    return collect_entries(items_path, "items")
 
 
 def load_items(

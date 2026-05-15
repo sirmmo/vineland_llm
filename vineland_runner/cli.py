@@ -17,7 +17,11 @@ def cmd_run(args: argparse.Namespace) -> None:
     config_path = Path(args.config)
     config = load_pilot_config(config_path)
 
-    agents_path = Path(args.agents) if args.agents else config_path.parent / "agents.yaml"
+    if args.agents:
+        agents_path = Path(args.agents)
+    else:
+        agents_dir = config_path.parent / "agents"
+        agents_path = agents_dir if agents_dir.is_dir() else config_path.parent / "agents.yaml"
     agents = load_agents(agents_path)
 
     items_path = Path(args.items) if args.items else Path("items")
@@ -157,7 +161,8 @@ def main() -> None:
     # run
     p_run = sub.add_parser("run", help="Run (or resume) a pilot")
     p_run.add_argument("--config", required=True, help="Path to pilot.yaml")
-    p_run.add_argument("--agents", default=None, help="Path to agents.yaml (default: next to pilot.yaml)")
+    p_run.add_argument("--agents", default=None,
+                       help="Path to agents YAML file or directory (default: sibling `agents/` dir of pilot.yaml, or agents.yaml)")
     p_run.add_argument("--items", default=None, help="Path to items YAML file or directory")
     p_run.add_argument("--schema", default=None, help="Path to item schema.json")
 

@@ -1,0 +1,9 @@
+id: gemma-27b
+display_name: Gemma 2 27B
+base_url: https://openrouter.ai/api/v1
+model_id: google/gemma-2-27b-it
+api_key_env: OPENROUTER_API_KEY
+max_tokens: 2048
+temperature: 0.7
+reasoning: false
+notes: mid-size open model

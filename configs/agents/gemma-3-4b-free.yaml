@@ -1,0 +1,10 @@
+id: gemma-3-4b-free
+display_name: Gemma 3 4B (free)
+base_url: https://openrouter.ai/api/v1
+model_id: google/gemma-3-4b-it:free
+api_key_env: OPENROUTER_API_KEY
+max_tokens: 2048
+temperature: 0.7
+reasoning: false
+wait_between_requests_s: 15
+notes: free tier

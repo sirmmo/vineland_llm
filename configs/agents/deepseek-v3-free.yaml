@@ -1,0 +1,10 @@
+id: deepseek-v3-free
+display_name: DeepSeek V3 (free)
+base_url: https://openrouter.ai/api/v1
+model_id: deepseek/deepseek-chat-v3-0324:free
+api_key_env: OPENROUTER_API_KEY
+max_tokens: 2048
+temperature: 0.7
+reasoning: false
+wait_between_requests_s: 15
+notes: free tier

@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import ValidationError
 
+from ._yaml_sources import collect_entries
 from .types import Agent, PilotConfig
 
 
@@ -17,11 +17,29 @@ def _load_yaml(path: Path) -> Any:
 
 
 def load_agents(path: Path) -> dict[str, Agent]:
-    data = _load_yaml(path)
+    """Load agents from a YAML file or a directory of YAML files.
+
+    Supports the same layouts as items:
+      - multi-agent file: {agents: [ {...}, {...} ]}
+      - single-agent file: {id: ..., display_name: ..., ...}
+    """
     agents: dict[str, Agent] = {}
-    for raw in data.get("agents", []):
+    errors: list[str] = []
+    seen_ids: dict[str, Path] = {}
+
+    for source, raw in collect_entries(path, "agents"):
         agent = Agent.model_validate(raw)
+        if agent.id in seen_ids:
+            errors.append(
+                f"Duplicate agent id {agent.id!r}: {seen_ids[agent.id]} and {source}"
+            )
+            continue
+        seen_ids[agent.id] = source
         agents[agent.id] = agent
+
+    if errors:
+        raise ValueError("Agent load errors:\n" + "\n".join(errors))
+
     return agents
 
 

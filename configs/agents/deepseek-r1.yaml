@@ -1,0 +1,9 @@
+id: deepseek-r1
+display_name: DeepSeek R1
+base_url: https://openrouter.ai/api/v1
+model_id: deepseek/deepseek-r1
+api_key_env: OPENROUTER_API_KEY
+max_tokens: 4096
+temperature: 0.7
+reasoning: true
+notes: open reasoning model
