@@ -2,8 +2,6 @@
 
 Python CLI tool for evaluating LLM agents against a psychometric assessment instrument adapted from the [Vineland Adaptive Behavior Scales (VABS-3)](https://www.pearsonassessments.com/store/usassessments/en/Store/Professional-Assessments/Behavior/Adaptive/Vineland-Adaptive-Behavior-Scales-%7C-Third-Edition/p/100001622.html) methodology.
 
-Targeting: NeurIPS 2026 Education Track pilot — 8 models × 24 items × 5 replications = 960 runs.
-
 ---
 
 ## Installation
